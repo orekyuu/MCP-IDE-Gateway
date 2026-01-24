@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "intellij-mcp"
+rootProject.name = "mcp-ide-gateway"

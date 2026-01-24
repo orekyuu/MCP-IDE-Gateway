@@ -48,7 +48,7 @@ public class McpServerImpl {
             mcpServer = McpServer.sync(transportProvider)
                 .jsonMapper(jsonMapper)
                 .jsonSchemaValidator(jsonSchemaValidator)
-                .serverInfo("intellij-mcp", "1.0.0")
+                .serverInfo("mcp-ide-gateway", "1.0.0")
                 .capabilities(McpSchema.ServerCapabilities.builder()
                         .logging()
                         .prompts(false)

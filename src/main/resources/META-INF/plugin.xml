@@ -1,22 +1,17 @@
 <idea-plugin>
-    <id>net.orekyuu.intellij-mcp</id>
-    <name>IntelliJ MCP Server</name>
+    <id>net.orekyuu.mcp-ide-gateway</id>
+    <name>MCP IDE Gateway</name>
     <vendor email="support@orekyuu.net" url="https://github.com/orekyuu">orekyuu</vendor>
 
     <description><![CDATA[
-        Model Context Protocol (MCP) server implementation for IntelliJ IDEA.
-        <br/>
-        <br/>
-        Provides tools for accessing project information, opening files,
-        retrieving PSI (Program Structure Interface) data, and call hierarchies.
+        MCP (Model Context Protocol) server that enables AI assistants like Claude to access and interact with your IDE.
         <br/>
         <br/>
         Features:
         <ul>
-            <li>Get list of open projects</li>
-            <li>Open files in the IDE</li>
-            <li>Retrieve Java PSI (syntax tree) information</li>
-            <li>Get call hierarchy (callers/callees) for methods</li>
+            <li>List open projects</li>
+            <li>Open files in the editor</li>
+            <li>Get call hierarchy for methods</li>
         </ul>
     ]]></description>
 

@@ -54,7 +54,7 @@ dependencies {
 }
 
 intellijPlatform {
-    projectName = "intellij-mcp"
+    projectName = "mcp-ide-gateway"
 
     pluginConfiguration {
         version = "1.0-SNAPSHOT"
