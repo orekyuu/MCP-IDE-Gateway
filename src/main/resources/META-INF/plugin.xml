@@ -1,0 +1,35 @@
+<idea-plugin>
+    <id>net.orekyuu.intellij-mcp</id>
+    <name>IntelliJ MCP Server</name>
+    <vendor email="support@orekyuu.net" url="https://github.com/orekyuu">orekyuu</vendor>
+
+    <description><![CDATA[
+        Model Context Protocol (MCP) server implementation for IntelliJ IDEA.
+        <br/>
+        <br/>
+        Provides tools for accessing project information, opening files,
+        retrieving PSI (Program Structure Interface) data, and call hierarchies.
+        <br/>
+        <br/>
+        Features:
+        <ul>
+            <li>Get list of open projects</li>
+            <li>Open files in the IDE</li>
+            <li>Retrieve Java PSI (syntax tree) information</li>
+            <li>Get call hierarchy (callers/callees) for methods</li>
+        </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="net.orekyuu.intellijmcp.services.McpServerService"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="net.orekyuu.intellijmcp.listeners.McpServerStartupListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+</idea-plugin>
