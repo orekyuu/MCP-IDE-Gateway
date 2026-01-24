@@ -8,6 +8,8 @@ import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.*;
+
 public class ListProjectsToolTest extends BasePlatformTestCase {
 
     private static final Gson GSON = new Gson();
@@ -20,52 +22,47 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
     }
 
     public void testGetName() {
-        assertEquals("list_projects", tool.getName());
+        assertThat(tool.getName()).isEqualTo("list_projects");
     }
 
     public void testGetDescription() {
-        assertNotNull(tool.getDescription());
-        assertTrue(tool.getDescription().contains("project"));
+        assertThat(tool.getDescription())
+                .isNotNull()
+                .containsIgnoringCase("project");
     }
 
     public void testGetInputSchema() {
         McpSchema.JsonSchema schema = tool.getInputSchema();
-        assertNotNull(schema);
-        assertEquals("object", schema.type());
-        // list_projects has no required parameters
-        assertNull(schema.required());
+
+        assertThat(schema).isNotNull();
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.required()).isNull();
     }
 
     public void testExecuteReturnsProjects() {
         McpSchema.CallToolResult result = tool.execute(Map.of());
 
-        assertNotNull(result);
-        assertFalse(result.isError());
-        assertNotNull(result.content());
-        assertFalse(result.content().isEmpty());
+        assertThat(result).isNotNull();
+        assertThat(result.isError()).isFalse();
+        assertThat(result.content()).isNotEmpty();
 
-        // Parse the result content
         McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
         String jsonResult = textContent.text();
 
-        // Should be valid JSON array
         JsonArray projects = GSON.fromJson(jsonResult, JsonArray.class);
-        assertNotNull(projects);
+        assertThat(projects).isNotNull();
+        assertThat(projects.size()).isGreaterThanOrEqualTo(1);
 
-        // In test environment, there should be at least one project (the test project)
-        assertTrue(projects.size() >= 1);
-
-        // Check project structure
         JsonObject project = projects.get(0).getAsJsonObject();
-        assertTrue(project.has("name"));
-        assertTrue(project.has("locationHash"));
+        assertThat(project.has("name")).isTrue();
+        assertThat(project.has("locationHash")).isTrue();
     }
 
     public void testToSpecification() {
         var spec = tool.toSpecification();
 
-        assertNotNull(spec);
-        assertNotNull(spec.tool());
-        assertEquals("list_projects", spec.tool().name());
+        assertThat(spec).isNotNull();
+        assertThat(spec.tool()).isNotNull();
+        assertThat(spec.tool().name()).isEqualTo("list_projects");
     }
 }

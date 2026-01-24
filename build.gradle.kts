@@ -51,6 +51,8 @@ dependencies {
     // JUnit 4 for IntelliJ Platform test framework
     testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.0")
+    // AssertJ
+    testImplementation("org.assertj:assertj-core:3.26.3")
 }
 
 intellijPlatform {

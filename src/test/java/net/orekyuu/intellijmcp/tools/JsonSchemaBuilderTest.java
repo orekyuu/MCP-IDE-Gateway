@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class JsonSchemaBuilderTest {
 
@@ -14,9 +14,9 @@ class JsonSchemaBuilderTest {
     void buildEmptySchema() {
         McpSchema.JsonSchema schema = JsonSchemaBuilder.object().build();
 
-        assertEquals("object", schema.type());
-        assertNull(schema.properties());
-        assertNull(schema.required());
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties()).isNull();
+        assertThat(schema.required()).isNull();
     }
 
     @Test
@@ -25,17 +25,16 @@ class JsonSchemaBuilderTest {
                 .requiredString("filePath", "Path to the file")
                 .build();
 
-        assertEquals("object", schema.type());
-        assertNotNull(schema.properties());
-        assertEquals(1, schema.properties().size());
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties()).hasSize(1);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> filePathProp = (Map<String, Object>) schema.properties().get("filePath");
-        assertEquals("string", filePathProp.get("type"));
-        assertEquals("Path to the file", filePathProp.get("description"));
+        assertThat(filePathProp)
+                .containsEntry("type", "string")
+                .containsEntry("description", "Path to the file");
 
-        assertNotNull(schema.required());
-        assertEquals(List.of("filePath"), schema.required());
+        assertThat(schema.required()).containsExactly("filePath");
     }
 
     @Test
@@ -44,17 +43,16 @@ class JsonSchemaBuilderTest {
                 .optionalString("projectName", "Name of the project")
                 .build();
 
-        assertEquals("object", schema.type());
-        assertNotNull(schema.properties());
-        assertEquals(1, schema.properties().size());
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties()).hasSize(1);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> prop = (Map<String, Object>) schema.properties().get("projectName");
-        assertEquals("string", prop.get("type"));
-        assertEquals("Name of the project", prop.get("description"));
+        assertThat(prop)
+                .containsEntry("type", "string")
+                .containsEntry("description", "Name of the project");
 
-        // Optional should not be in required list
-        assertNull(schema.required());
+        assertThat(schema.required()).isNull();
     }
 
     @Test
@@ -63,15 +61,15 @@ class JsonSchemaBuilderTest {
                 .requiredInteger("offset", "Character offset")
                 .build();
 
-        assertEquals("object", schema.type());
-        assertNotNull(schema.properties());
+        assertThat(schema.type()).isEqualTo("object");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> prop = (Map<String, Object>) schema.properties().get("offset");
-        assertEquals("integer", prop.get("type"));
-        assertEquals("Character offset", prop.get("description"));
+        assertThat(prop)
+                .containsEntry("type", "integer")
+                .containsEntry("description", "Character offset");
 
-        assertEquals(List.of("offset"), schema.required());
+        assertThat(schema.required()).containsExactly("offset");
     }
 
     @Test
@@ -80,13 +78,11 @@ class JsonSchemaBuilderTest {
                 .optionalInteger("depth", "Search depth")
                 .build();
 
-        assertNotNull(schema.properties());
-
         @SuppressWarnings("unchecked")
         Map<String, Object> prop = (Map<String, Object>) schema.properties().get("depth");
-        assertEquals("integer", prop.get("type"));
+        assertThat(prop).containsEntry("type", "integer");
 
-        assertNull(schema.required());
+        assertThat(schema.required()).isNull();
     }
 
     @Test
@@ -97,9 +93,9 @@ class JsonSchemaBuilderTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> prop = (Map<String, Object>) schema.properties().get("recursive");
-        assertEquals("boolean", prop.get("type"));
+        assertThat(prop).containsEntry("type", "boolean");
 
-        assertEquals(List.of("recursive"), schema.required());
+        assertThat(schema.required()).containsExactly("recursive");
     }
 
     @Test
@@ -110,9 +106,9 @@ class JsonSchemaBuilderTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> prop = (Map<String, Object>) schema.properties().get("verbose");
-        assertEquals("boolean", prop.get("type"));
+        assertThat(prop).containsEntry("type", "boolean");
 
-        assertNull(schema.required());
+        assertThat(schema.required()).isNull();
     }
 
     @Test
@@ -124,29 +120,23 @@ class JsonSchemaBuilderTest {
                 .optionalInteger("depth", "Search depth")
                 .build();
 
-        assertEquals("object", schema.type());
-        assertNotNull(schema.properties());
-        assertEquals(4, schema.properties().size());
-
-        // Only required fields should be in required list
-        assertNotNull(schema.required());
-        assertEquals(2, schema.required().size());
-        assertTrue(schema.required().contains("filePath"));
-        assertTrue(schema.required().contains("offset"));
-        assertFalse(schema.required().contains("projectName"));
-        assertFalse(schema.required().contains("depth"));
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties()).hasSize(4);
+        assertThat(schema.required())
+                .hasSize(2)
+                .contains("filePath", "offset")
+                .doesNotContain("projectName", "depth");
     }
 
     @Test
     void builderIsFluent() {
         JsonSchemaBuilder builder = JsonSchemaBuilder.object();
 
-        // All methods should return the same builder instance
-        assertSame(builder, builder.requiredString("a", "desc"));
-        assertSame(builder, builder.optionalString("b", "desc"));
-        assertSame(builder, builder.requiredInteger("c", "desc"));
-        assertSame(builder, builder.optionalInteger("d", "desc"));
-        assertSame(builder, builder.requiredBoolean("e", "desc"));
-        assertSame(builder, builder.optionalBoolean("f", "desc"));
+        assertThat(builder.requiredString("a", "desc")).isSameAs(builder);
+        assertThat(builder.optionalString("b", "desc")).isSameAs(builder);
+        assertThat(builder.requiredInteger("c", "desc")).isSameAs(builder);
+        assertThat(builder.optionalInteger("d", "desc")).isSameAs(builder);
+        assertThat(builder.requiredBoolean("e", "desc")).isSameAs(builder);
+        assertThat(builder.optionalBoolean("f", "desc")).isSameAs(builder);
     }
 }

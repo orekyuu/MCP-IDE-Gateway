@@ -1,11 +1,11 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.Map;
+
+import static org.assertj.core.api.Assertions.*;
 
 public class OpenFileToolTest extends BasePlatformTestCase {
 
@@ -18,38 +18,39 @@ public class OpenFileToolTest extends BasePlatformTestCase {
     }
 
     public void testGetName() {
-        assertEquals("open_file", tool.getName());
+        assertThat(tool.getName()).isEqualTo("open_file");
     }
 
     public void testGetDescription() {
-        assertNotNull(tool.getDescription());
-        assertTrue(tool.getDescription().toLowerCase().contains("open"));
-        assertTrue(tool.getDescription().toLowerCase().contains("file"));
+        assertThat(tool.getDescription())
+                .isNotNull()
+                .containsIgnoringCase("open")
+                .containsIgnoringCase("file");
     }
 
     public void testGetInputSchema() {
         McpSchema.JsonSchema schema = tool.getInputSchema();
 
-        assertNotNull(schema);
-        assertEquals("object", schema.type());
-        assertNotNull(schema.properties());
-        assertTrue(schema.properties().containsKey("filePath"));
-        assertTrue(schema.properties().containsKey("projectName"));
-
-        // filePath should be required
-        assertNotNull(schema.required());
-        assertTrue(schema.required().contains("filePath"));
-        assertFalse(schema.required().contains("projectName"));
+        assertThat(schema).isNotNull();
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties())
+                .isNotNull()
+                .containsKey("filePath")
+                .containsKey("projectName");
+        assertThat(schema.required())
+                .isNotNull()
+                .contains("filePath")
+                .doesNotContain("projectName");
     }
 
     public void testExecuteWithMissingFilePath() {
         McpSchema.CallToolResult result = tool.execute(Map.of());
 
-        assertNotNull(result);
-        assertTrue(result.isError());
+        assertThat(result).isNotNull();
+        assertThat(result.isError()).isTrue();
 
         McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertTrue(textContent.text().contains("filePath"));
+        assertThat(textContent.text()).contains("filePath");
     }
 
     public void testExecuteWithNonExistentFile() {
@@ -57,33 +58,32 @@ public class OpenFileToolTest extends BasePlatformTestCase {
                 "filePath", "/nonexistent/path/to/file.java"
         ));
 
-        assertNotNull(result);
-        assertTrue(result.isError());
+        assertThat(result).isNotNull();
+        assertThat(result.isError()).isTrue();
 
         McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertTrue(textContent.text().contains("not found"));
+        assertThat(textContent.text()).containsIgnoringCase("not found");
     }
 
     public void testExecuteWithInvalidProjectName() {
-        // Use a path that doesn't need VFS access validation
         McpSchema.CallToolResult result = tool.execute(Map.of(
                 "filePath", "/some/test/file.java",
                 "projectName", "NonExistentProject"
         ));
 
-        assertNotNull(result);
-        assertTrue(result.isError());
+        assertThat(result).isNotNull();
+        assertThat(result.isError()).isTrue();
 
         McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertTrue(textContent.text().contains("Project not found"));
+        assertThat(textContent.text()).contains("Project not found");
     }
 
     public void testToSpecification() {
         var spec = tool.toSpecification();
 
-        assertNotNull(spec);
-        assertNotNull(spec.tool());
-        assertEquals("open_file", spec.tool().name());
-        assertNotNull(spec.tool().inputSchema());
+        assertThat(spec).isNotNull();
+        assertThat(spec.tool()).isNotNull();
+        assertThat(spec.tool().name()).isEqualTo("open_file");
+        assertThat(spec.tool().inputSchema()).isNotNull();
     }
 }

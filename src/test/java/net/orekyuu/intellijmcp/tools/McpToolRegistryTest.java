@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class McpToolRegistryTest {
 
@@ -13,26 +13,24 @@ class McpToolRegistryTest {
         McpToolRegistry registry = McpToolRegistry.createDefault();
 
         List<McpTool> tools = registry.getTools();
-        assertNotNull(tools);
-        assertTrue(tools.size() >= 2);
+        assertThat(tools).isNotNull();
+        assertThat(tools).hasSizeGreaterThanOrEqualTo(2);
 
-        // Check that expected tools are registered
         List<String> toolNames = tools.stream().map(McpTool::getName).toList();
-        assertTrue(toolNames.contains("list_projects"));
-        assertTrue(toolNames.contains("open_file"));
-        assertTrue(toolNames.contains("get_call_hierarchy"));
+        assertThat(toolNames)
+                .contains("list_projects", "open_file", "get_call_hierarchy");
     }
 
     @Test
     void registerAddsTool() {
         McpToolRegistry registry = new McpToolRegistry();
-        assertEquals(0, registry.size());
+        assertThat(registry.size()).isZero();
 
         registry.register(new ListProjectsTool());
-        assertEquals(1, registry.size());
+        assertThat(registry.size()).isEqualTo(1);
 
         registry.register(new OpenFileTool());
-        assertEquals(2, registry.size());
+        assertThat(registry.size()).isEqualTo(2);
     }
 
     @Test
@@ -40,31 +38,29 @@ class McpToolRegistryTest {
         McpToolRegistry registry = McpToolRegistry.createDefault();
         List<McpTool> tools = registry.getTools();
 
-        assertThrows(UnsupportedOperationException.class, () -> {
-            tools.add(new ListProjectsTool());
-        });
+        assertThatThrownBy(() -> tools.add(new ListProjectsTool()))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void sizeReturnsCorrectCount() {
         McpToolRegistry registry = new McpToolRegistry();
-        assertEquals(0, registry.size());
+        assertThat(registry.size()).isZero();
 
         registry.register(new ListProjectsTool());
-        assertEquals(1, registry.size());
+        assertThat(registry.size()).isEqualTo(1);
 
         registry.register(new OpenFileTool());
-        assertEquals(2, registry.size());
+        assertThat(registry.size()).isEqualTo(2);
 
         registry.register(new CallHierarchyTool());
-        assertEquals(3, registry.size());
+        assertThat(registry.size()).isEqualTo(3);
     }
 
     @Test
     void registerCustomTool() {
         McpToolRegistry registry = new McpToolRegistry();
 
-        // Create a custom tool for testing
         McpTool customTool = new AbstractMcpTool() {
             @Override
             public String getName() {
@@ -91,7 +87,7 @@ class McpToolRegistryTest {
 
         registry.register(customTool);
 
-        assertEquals(1, registry.size());
-        assertEquals("custom_tool", registry.getTools().get(0).getName());
+        assertThat(registry.size()).isEqualTo(1);
+        assertThat(registry.getTools().get(0).getName()).isEqualTo("custom_tool");
     }
 }
