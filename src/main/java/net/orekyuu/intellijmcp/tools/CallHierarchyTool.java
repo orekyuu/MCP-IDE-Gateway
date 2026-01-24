@@ -1,8 +1,9 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -25,7 +26,7 @@ import java.util.*;
 public class CallHierarchyTool extends AbstractMcpTool {
 
     private static final Logger LOG = Logger.getInstance(CallHierarchyTool.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int DEFAULT_DEPTH = 3;
     private static final int MAX_DEPTH = 10;
 
@@ -117,29 +118,32 @@ public class CallHierarchyTool extends AbstractMcpTool {
 
             // Build call hierarchy using ReadAction.nonBlocking() for heavy search operations
             Set<PsiMethod> visited = new HashSet<>();
-            JsonObject result = buildCallHierarchy(project, method, finalDepth, visited);
-            return successResult(GSON.toJson(result));
+            ObjectNode result = buildCallHierarchy(project, method, finalDepth, visited);
+            return successResult(MAPPER.writeValueAsString(result));
 
+        } catch (JsonProcessingException e) {
+            LOG.error("Error serializing JSON in get_call_hierarchy tool", e);
+            return errorResult("Error: " + e.getMessage());
         } catch (Exception e) {
             LOG.error("Error in get_call_hierarchy tool", e);
             return errorResult("Error: " + e.getMessage());
         }
     }
 
-    private JsonObject buildCallHierarchy(Project project, PsiMethod method, int maxDepth, Set<PsiMethod> visited) {
+    private ObjectNode buildCallHierarchy(Project project, PsiMethod method, int maxDepth, Set<PsiMethod> visited) {
         // Create method info in read action
-        JsonObject root = ReadAction.compute(() -> createMethodInfo(method));
+        ObjectNode root = ReadAction.compute(() -> createMethodInfo(method));
 
         if (maxDepth > 0) {
-            JsonArray callers = findCallers(project, method, maxDepth, 1, visited);
-            root.add("callers", callers);
+            ArrayNode callers = findCallers(project, method, maxDepth, 1, visited);
+            root.set("callers", callers);
         }
 
         return root;
     }
 
-    private JsonArray findCallers(Project project, PsiMethod method, int maxDepth, int currentDepth, Set<PsiMethod> visited) {
-        JsonArray callers = new JsonArray();
+    private ArrayNode findCallers(Project project, PsiMethod method, int maxDepth, int currentDepth, Set<PsiMethod> visited) {
+        ArrayNode callers = MAPPER.createArrayNode();
 
         if (visited.contains(method)) {
             return callers; // Avoid infinite loops
@@ -185,13 +189,13 @@ public class CallHierarchyTool extends AbstractMcpTool {
             });
 
             for (PsiMethod callerMethod : callerMethods) {
-                JsonObject callerInfo = ReadAction.compute(() -> createMethodInfo(callerMethod));
+                ObjectNode callerInfo = ReadAction.compute(() -> createMethodInfo(callerMethod));
 
                 // Recursively find callers if not at max depth
                 if (currentDepth < maxDepth && !visited.contains(callerMethod)) {
-                    JsonArray nestedCallers = findCallers(project, callerMethod, maxDepth, currentDepth + 1, visited);
+                    ArrayNode nestedCallers = findCallers(project, callerMethod, maxDepth, currentDepth + 1, visited);
                     if (nestedCallers.size() > 0) {
-                        callerInfo.add("callers", nestedCallers);
+                        callerInfo.set("callers", nestedCallers);
                     }
                 }
 
@@ -204,14 +208,14 @@ public class CallHierarchyTool extends AbstractMcpTool {
         return callers;
     }
 
-    private JsonObject createMethodInfo(PsiMethod method) {
-        JsonObject info = new JsonObject();
-        info.addProperty("name", method.getName());
+    private ObjectNode createMethodInfo(PsiMethod method) {
+        ObjectNode info = MAPPER.createObjectNode();
+        info.put("name", method.getName());
 
         // Get containing class
         PsiClass containingClass = method.getContainingClass();
         if (containingClass != null) {
-            info.addProperty("className", containingClass.getQualifiedName());
+            info.put("className", containingClass.getQualifiedName());
         }
 
         // Get file path and line number
@@ -219,7 +223,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
         if (containingFile != null) {
             VirtualFile virtualFile = containingFile.getVirtualFile();
             if (virtualFile != null) {
-                info.addProperty("filePath", virtualFile.getPath());
+                info.put("filePath", virtualFile.getPath());
             }
 
             // Get line number
@@ -228,7 +232,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
                     PsiDocumentManager.getInstance(method.getProject()).getDocument(containingFile);
             if (document != null) {
                 int lineNumber = document.getLineNumber(offset) + 1; // 1-indexed
-                info.addProperty("lineNumber", lineNumber);
+                info.put("lineNumber", lineNumber);
             }
         }
 
@@ -241,7 +245,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
             signature.append(parameters[i].getType().getPresentableText());
         }
         signature.append(")");
-        info.addProperty("signature", signature.toString());
+        info.put("signature", signature.toString());
 
         return info;
     }

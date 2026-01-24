@@ -29,8 +29,6 @@ dependencies {
     implementation("io.modelcontextprotocol.sdk:mcp")
     implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2")
 
-    // JSON処理
-    implementation("com.google.code.gson:gson:2.11.0")
 
     // リアクティブストリーム
     implementation("io.projectreactor:reactor-core:3.6.12")

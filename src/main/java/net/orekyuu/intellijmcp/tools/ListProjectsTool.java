@@ -1,8 +1,9 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -16,7 +17,7 @@ import java.util.Map;
 public class ListProjectsTool extends AbstractMcpTool {
 
     private static final Logger LOG = Logger.getInstance(ListProjectsTool.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     public String getName() {
@@ -39,20 +40,23 @@ public class ListProjectsTool extends AbstractMcpTool {
             try {
                 Project[] projects = getOpenProjects();
 
-                JsonArray projectList = new JsonArray();
+                ArrayNode projectList = MAPPER.createArrayNode();
                 for (Project project : projects) {
-                    JsonObject projectInfo = new JsonObject();
-                    projectInfo.addProperty("name", project.getName());
+                    ObjectNode projectInfo = MAPPER.createObjectNode();
+                    projectInfo.put("name", project.getName());
                     String basePath = project.getBasePath();
                     if (basePath != null) {
-                        projectInfo.addProperty("basePath", basePath);
+                        projectInfo.put("basePath", basePath);
                     }
-                    projectInfo.addProperty("locationHash", project.getLocationHash());
+                    projectInfo.put("locationHash", project.getLocationHash());
                     projectList.add(projectInfo);
                 }
 
-                String result = GSON.toJson(projectList);
+                String result = MAPPER.writeValueAsString(projectList);
                 return successResult(result);
+            } catch (JsonProcessingException e) {
+                LOG.error("Error serializing JSON in list_projects tool", e);
+                return errorResult("Error: " + e.getMessage());
             } catch (Exception e) {
                 LOG.error("Error in list_projects tool", e);
                 return errorResult("Error: " + e.getMessage());

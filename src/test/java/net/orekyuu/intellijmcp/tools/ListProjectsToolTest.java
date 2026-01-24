@@ -1,8 +1,7 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.modelcontextprotocol.spec.McpSchema;
 
@@ -12,7 +11,7 @@ import static org.assertj.core.api.Assertions.*;
 
 public class ListProjectsToolTest extends BasePlatformTestCase {
 
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private ListProjectsTool tool;
 
     @Override
@@ -39,7 +38,7 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
         assertThat(schema.required()).isNull();
     }
 
-    public void testExecuteReturnsProjects() {
+    public void testExecuteReturnsProjects() throws Exception {
         McpSchema.CallToolResult result = tool.execute(Map.of());
 
         assertThat(result).isNotNull();
@@ -49,11 +48,12 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
         McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
         String jsonResult = textContent.text();
 
-        JsonArray projects = GSON.fromJson(jsonResult, JsonArray.class);
+        JsonNode projects = MAPPER.readTree(jsonResult);
         assertThat(projects).isNotNull();
+        assertThat(projects.isArray()).isTrue();
         assertThat(projects.size()).isGreaterThanOrEqualTo(1);
 
-        JsonObject project = projects.get(0).getAsJsonObject();
+        JsonNode project = projects.get(0);
         assertThat(project.has("name")).isTrue();
         assertThat(project.has("locationHash")).isTrue();
     }
