@@ -111,6 +111,11 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
         Integer lineNumber = null;
         String classType = getClassType(psiClass);
 
+        // Get text range
+        var textRange = psiClass.getTextRange();
+        int startOffset = textRange.getStartOffset();
+        int endOffset = textRange.getEndOffset();
+
         PsiFile containingFile = psiClass.getContainingFile();
         if (containingFile != null) {
             VirtualFile virtualFile = containingFile.getVirtualFile();
@@ -127,7 +132,7 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
             }
         }
 
-        return new ClassInfo(name, qualifiedName, filePath, lineNumber, classType);
+        return new ClassInfo(name, qualifiedName, filePath, lineNumber, classType, new TextRange(startOffset, endOffset));
     }
 
     private String getClassType(PsiClass psiClass) {
@@ -160,6 +165,15 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
             String qualifiedName,
             String filePath,
             Integer lineNumber,
-            String classType
+            String classType,
+            TextRange textRange
+    ) {}
+
+    /**
+     * Represents a range of text in a file.
+     */
+    public record TextRange(
+            int startOffset,
+            int endOffset
     ) {}
 }
