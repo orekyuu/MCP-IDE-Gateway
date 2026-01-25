@@ -203,7 +203,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
         String name = method.getName();
         String className = null;
         String filePath = null;
-        Integer lineNumber = null;
+        LineRange lineRange = null;
 
         // Get containing class
         PsiClass containingClass = method.getContainingClass();
@@ -211,7 +211,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
             className = containingClass.getQualifiedName();
         }
 
-        // Get file path and line number
+        // Get file path and line range
         PsiFile containingFile = method.getContainingFile();
         if (containingFile != null) {
             VirtualFile virtualFile = containingFile.getVirtualFile();
@@ -219,12 +219,14 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
                 filePath = virtualFile.getPath();
             }
 
-            // Get line number
-            int offset = method.getTextOffset();
+            // Get line range
+            var textRange = method.getTextRange();
             com.intellij.openapi.editor.Document document =
                     PsiDocumentManager.getInstance(method.getProject()).getDocument(containingFile);
             if (document != null) {
-                lineNumber = document.getLineNumber(offset) + 1; // 1-indexed
+                int startLine = document.getLineNumber(textRange.getStartOffset()) + 1; // 1-indexed
+                int endLine = document.getLineNumber(textRange.getEndOffset()) + 1; // 1-indexed
+                lineRange = new LineRange(startLine, endLine);
             }
         }
 
@@ -238,7 +240,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
         }
         signature.append(")");
 
-        return new MethodInfo(name, className, filePath, lineNumber, signature.toString(), Collections.emptyList());
+        return new MethodInfo(name, className, filePath, signature.toString(), lineRange, Collections.emptyList());
     }
 
     /**
@@ -253,15 +255,15 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
             String name,
             String className,
             String filePath,
-            Integer lineNumber,
             String signature,
+            LineRange lineRange,
             List<MethodInfo> callers
     ) {
         /**
          * Returns a new MethodInfo with the given callers.
          */
         public MethodInfo withCallers(List<MethodInfo> callers) {
-            return new MethodInfo(name, className, filePath, lineNumber, signature, callers);
+            return new MethodInfo(name, className, filePath, signature, lineRange, callers);
         }
     }
 }

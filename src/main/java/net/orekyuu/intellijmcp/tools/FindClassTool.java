@@ -108,13 +108,8 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
         String name = psiClass.getName();
         String qualifiedName = psiClass.getQualifiedName();
         String filePath = null;
-        Integer lineNumber = null;
+        LineRange lineRange = null;
         String classType = getClassType(psiClass);
-
-        // Get text range
-        var textRange = psiClass.getTextRange();
-        int startOffset = textRange.getStartOffset();
-        int endOffset = textRange.getEndOffset();
 
         PsiFile containingFile = psiClass.getContainingFile();
         if (containingFile != null) {
@@ -123,16 +118,18 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
                 filePath = virtualFile.getPath();
             }
 
-            // Get line number
-            int offset = psiClass.getTextOffset();
+            // Get line range
+            var textRange = psiClass.getTextRange();
             com.intellij.openapi.editor.Document document =
                     PsiDocumentManager.getInstance(psiClass.getProject()).getDocument(containingFile);
             if (document != null) {
-                lineNumber = document.getLineNumber(offset) + 1; // 1-indexed
+                int startLine = document.getLineNumber(textRange.getStartOffset()) + 1; // 1-indexed
+                int endLine = document.getLineNumber(textRange.getEndOffset()) + 1; // 1-indexed
+                lineRange = new LineRange(startLine, endLine);
             }
         }
 
-        return new ClassInfo(name, qualifiedName, filePath, lineNumber, classType, new TextRange(startOffset, endOffset));
+        return new ClassInfo(name, qualifiedName, filePath, classType, lineRange);
     }
 
     private String getClassType(PsiClass psiClass) {
@@ -164,16 +161,7 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
             String name,
             String qualifiedName,
             String filePath,
-            Integer lineNumber,
             String classType,
-            TextRange textRange
-    ) {}
-
-    /**
-     * Represents a range of text in a file.
-     */
-    public record TextRange(
-            int startOffset,
-            int endOffset
+            LineRange lineRange
     ) {}
 }
