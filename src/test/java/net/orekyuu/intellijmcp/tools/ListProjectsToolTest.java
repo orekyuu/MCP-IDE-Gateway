@@ -39,23 +39,20 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
     }
 
     public void testExecuteReturnsProjects() throws Exception {
-        McpSchema.CallToolResult result = tool.execute(Map.of());
+        var result = tool.execute(Map.of());
 
         assertThat(result).isNotNull();
-        assertThat(result.isError()).isFalse();
-        assertThat(result.content()).isNotEmpty();
+        assertThat(result).isInstanceOf(McpTool.Result.SuccessResponse.class);
 
-        McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        String jsonResult = textContent.text();
+        var successResult = (McpTool.Result.SuccessResponse<ErrorResponse, ListProjectsTool.ListProjectsResponse>) result;
+        ListProjectsTool.ListProjectsResponse response = successResult.message();
 
-        JsonNode projects = MAPPER.readTree(jsonResult);
-        assertThat(projects).isNotNull();
-        assertThat(projects.isArray()).isTrue();
-        assertThat(projects.size()).isGreaterThanOrEqualTo(1);
+        assertThat(response.projects()).isNotNull();
+        assertThat(response.projects().size()).isGreaterThanOrEqualTo(1);
 
-        JsonNode project = projects.get(0);
-        assertThat(project.has("name")).isTrue();
-        assertThat(project.has("locationHash")).isTrue();
+        ListProjectsTool.ListProjectsResponse.ProjectInfo project = response.projects().get(0);
+        assertThat(project.name()).isNotNull();
+        assertThat(project.locationHash()).isNotNull();
     }
 
     public void testToSpecification() {

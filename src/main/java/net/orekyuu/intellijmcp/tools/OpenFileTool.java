@@ -15,7 +15,7 @@ import java.util.Optional;
  * MCP tool that opens a file in the IntelliJ IDEA editor.
  * Supports specifying a target project or using the first available project.
  */
-public class OpenFileTool extends AbstractMcpTool {
+public class OpenFileTool extends AbstractMcpTool<OpenFileTool.OpenFileResponse> {
 
     private static final Logger LOG = Logger.getInstance(OpenFileTool.class);
 
@@ -38,7 +38,7 @@ public class OpenFileTool extends AbstractMcpTool {
     }
 
     @Override
-    public McpSchema.CallToolResult execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, OpenFileResponse> execute(Map<String, Object> arguments) {
         try {
             // Get required file path
             String filePath;
@@ -78,10 +78,12 @@ public class OpenFileTool extends AbstractMcpTool {
                 FileEditorManager.getInstance(project).openFile(file, true);
             });
 
-            return successResult("File opened successfully: " + filePath);
+            return successResult(new OpenFileResponse("File opened successfully: " + filePath));
         } catch (Exception e) {
             LOG.error("Error in open_file tool", e);
             return errorResult("Error: " + e.getMessage());
         }
     }
+
+    public record OpenFileResponse(String message) {}
 }

@@ -8,16 +8,17 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import io.modelcontextprotocol.spec.McpSchema;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 /**
  * MCP tool that lists all open projects in IntelliJ IDEA.
  * Returns project name, base path, and location hash for each open project.
  */
-public class ListProjectsTool extends AbstractMcpTool {
+public class ListProjectsTool extends AbstractMcpTool<ListProjectsTool.ListProjectsResponse> {
 
     private static final Logger LOG = Logger.getInstance(ListProjectsTool.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     public String getName() {
@@ -35,32 +36,23 @@ public class ListProjectsTool extends AbstractMcpTool {
     }
 
     @Override
-    public McpSchema.CallToolResult execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, ListProjectsResponse> execute(Map<String, Object> arguments) {
         return runReadActionWithResult(() -> {
             try {
                 Project[] projects = getOpenProjects();
+                var projectInfoList = Arrays.stream(projects)
+                      .map(p -> new ListProjectsResponse.ProjectInfo(p.getName(), p.getBasePath(), p.getLocationHash()))
+                      .toList();
 
-                ArrayNode projectList = MAPPER.createArrayNode();
-                for (Project project : projects) {
-                    ObjectNode projectInfo = MAPPER.createObjectNode();
-                    projectInfo.put("name", project.getName());
-                    String basePath = project.getBasePath();
-                    if (basePath != null) {
-                        projectInfo.put("basePath", basePath);
-                    }
-                    projectInfo.put("locationHash", project.getLocationHash());
-                    projectList.add(projectInfo);
-                }
-
-                String result = MAPPER.writeValueAsString(projectList);
-                return successResult(result);
-            } catch (JsonProcessingException e) {
-                LOG.error("Error serializing JSON in list_projects tool", e);
-                return errorResult("Error: " + e.getMessage());
+                return successResult(new ListProjectsResponse(projectInfoList));
             } catch (Exception e) {
                 LOG.error("Error in list_projects tool", e);
                 return errorResult("Error: " + e.getMessage());
             }
         });
+    }
+
+    public record ListProjectsResponse(List<ProjectInfo> projects) {
+      public record ProjectInfo(String name, String basePath, String locationHash) {}
     }
 }

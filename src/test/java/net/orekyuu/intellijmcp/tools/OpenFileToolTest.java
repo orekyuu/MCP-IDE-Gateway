@@ -44,38 +44,38 @@ public class OpenFileToolTest extends BasePlatformTestCase {
     }
 
     public void testExecuteWithMissingFilePath() {
-        McpSchema.CallToolResult result = tool.execute(Map.of());
+        var result = tool.execute(Map.of());
 
         assertThat(result).isNotNull();
-        assertThat(result.isError()).isTrue();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertThat(textContent.text()).contains("filePath");
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OpenFileTool.OpenFileResponse>) result;
+        assertThat(errorResult.message().message()).contains("filePath");
     }
 
     public void testExecuteWithNonExistentFile() {
-        McpSchema.CallToolResult result = tool.execute(Map.of(
+        var result = tool.execute(Map.of(
                 "filePath", "/nonexistent/path/to/file.java"
         ));
 
         assertThat(result).isNotNull();
-        assertThat(result.isError()).isTrue();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertThat(textContent.text()).containsIgnoringCase("not found");
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OpenFileTool.OpenFileResponse>) result;
+        assertThat(errorResult.message().message()).containsIgnoringCase("not found");
     }
 
     public void testExecuteWithInvalidProjectName() {
-        McpSchema.CallToolResult result = tool.execute(Map.of(
+        var result = tool.execute(Map.of(
                 "filePath", "/some/test/file.java",
                 "projectName", "NonExistentProject"
         ));
 
         assertThat(result).isNotNull();
-        assertThat(result.isError()).isTrue();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        McpSchema.TextContent textContent = (McpSchema.TextContent) result.content().get(0);
-        assertThat(textContent.text()).contains("Project not found");
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OpenFileTool.OpenFileResponse>) result;
+        assertThat(errorResult.message().message()).contains("Project not found");
     }
 
     public void testToSpecification() {

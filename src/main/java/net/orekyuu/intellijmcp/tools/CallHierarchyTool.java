@@ -1,9 +1,5 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -23,10 +19,9 @@ import java.util.*;
  * Returns callers of the specified method using ReferencesSearch.
  * Uses ReadAction.nonBlocking() for better performance on large projects.
  */
-public class CallHierarchyTool extends AbstractMcpTool {
+public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHierarchyResponse> {
 
     private static final Logger LOG = Logger.getInstance(CallHierarchyTool.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int DEFAULT_DEPTH = 3;
     private static final int MAX_DEPTH = 10;
 
@@ -51,7 +46,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
     }
 
     @Override
-    public McpSchema.CallToolResult execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, CallHierarchyResponse> execute(Map<String, Object> arguments) {
         try {
             // Get arguments
             String filePath;
@@ -118,37 +113,34 @@ public class CallHierarchyTool extends AbstractMcpTool {
 
             // Build call hierarchy using ReadAction.nonBlocking() for heavy search operations
             Set<PsiMethod> visited = new HashSet<>();
-            ObjectNode result = buildCallHierarchy(project, method, finalDepth, visited);
-            return successResult(MAPPER.writeValueAsString(result));
+            MethodInfo methodInfo = buildCallHierarchy(project, method, finalDepth, visited);
+            return successResult(new CallHierarchyResponse(methodInfo));
 
-        } catch (JsonProcessingException e) {
-            LOG.error("Error serializing JSON in get_call_hierarchy tool", e);
-            return errorResult("Error: " + e.getMessage());
         } catch (Exception e) {
             LOG.error("Error in get_call_hierarchy tool", e);
             return errorResult("Error: " + e.getMessage());
         }
     }
 
-    private ObjectNode buildCallHierarchy(Project project, PsiMethod method, int maxDepth, Set<PsiMethod> visited) {
+    private MethodInfo buildCallHierarchy(Project project, PsiMethod method, int maxDepth, Set<PsiMethod> visited) {
         // Create method info in read action
-        ObjectNode root = ReadAction.compute(() -> createMethodInfo(method));
+        MethodInfo baseInfo = ReadAction.compute(() -> createMethodInfo(method));
 
+        List<MethodInfo> callers = Collections.emptyList();
         if (maxDepth > 0) {
-            ArrayNode callers = findCallers(project, method, maxDepth, 1, visited);
-            root.set("callers", callers);
+            callers = findCallers(project, method, maxDepth, 1, visited);
         }
 
-        return root;
+        return baseInfo.withCallers(callers);
     }
 
-    private ArrayNode findCallers(Project project, PsiMethod method, int maxDepth, int currentDepth, Set<PsiMethod> visited) {
-        ArrayNode callers = MAPPER.createArrayNode();
-
+    private List<MethodInfo> findCallers(Project project, PsiMethod method, int maxDepth, int currentDepth, Set<PsiMethod> visited) {
         if (visited.contains(method)) {
-            return callers; // Avoid infinite loops
+            return Collections.emptyList(); // Avoid infinite loops
         }
         visited.add(method);
+
+        List<MethodInfo> callers = new ArrayList<>();
 
         try {
             GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
@@ -172,12 +164,11 @@ public class CallHierarchyTool extends AbstractMcpTool {
                         .executeSynchronously();
                 allReferences.addAll(refs);
             }
-            Collection<PsiReference> references = allReferences;
 
             // Process references in a read action
             Set<PsiMethod> callerMethods = ReadAction.compute(() -> {
                 Set<PsiMethod> methods = new LinkedHashSet<>();
-                for (PsiReference ref : references) {
+                for (PsiReference ref : allReferences) {
                     PsiElement refElement = ref.getElement();
                     PsiMethod callerMethod = PsiTreeUtil.getParentOfType(refElement, PsiMethod.class, false);
 
@@ -189,13 +180,13 @@ public class CallHierarchyTool extends AbstractMcpTool {
             });
 
             for (PsiMethod callerMethod : callerMethods) {
-                ObjectNode callerInfo = ReadAction.compute(() -> createMethodInfo(callerMethod));
+                MethodInfo callerInfo = ReadAction.compute(() -> createMethodInfo(callerMethod));
 
                 // Recursively find callers if not at max depth
                 if (currentDepth < maxDepth && !visited.contains(callerMethod)) {
-                    ArrayNode nestedCallers = findCallers(project, callerMethod, maxDepth, currentDepth + 1, visited);
-                    if (nestedCallers.size() > 0) {
-                        callerInfo.set("callers", nestedCallers);
+                    List<MethodInfo> nestedCallers = findCallers(project, callerMethod, maxDepth, currentDepth + 1, visited);
+                    if (!nestedCallers.isEmpty()) {
+                        callerInfo = callerInfo.withCallers(nestedCallers);
                     }
                 }
 
@@ -208,14 +199,16 @@ public class CallHierarchyTool extends AbstractMcpTool {
         return callers;
     }
 
-    private ObjectNode createMethodInfo(PsiMethod method) {
-        ObjectNode info = MAPPER.createObjectNode();
-        info.put("name", method.getName());
+    private MethodInfo createMethodInfo(PsiMethod method) {
+        String name = method.getName();
+        String className = null;
+        String filePath = null;
+        Integer lineNumber = null;
 
         // Get containing class
         PsiClass containingClass = method.getContainingClass();
         if (containingClass != null) {
-            info.put("className", containingClass.getQualifiedName());
+            className = containingClass.getQualifiedName();
         }
 
         // Get file path and line number
@@ -223,7 +216,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
         if (containingFile != null) {
             VirtualFile virtualFile = containingFile.getVirtualFile();
             if (virtualFile != null) {
-                info.put("filePath", virtualFile.getPath());
+                filePath = virtualFile.getPath();
             }
 
             // Get line number
@@ -231,8 +224,7 @@ public class CallHierarchyTool extends AbstractMcpTool {
             com.intellij.openapi.editor.Document document =
                     PsiDocumentManager.getInstance(method.getProject()).getDocument(containingFile);
             if (document != null) {
-                int lineNumber = document.getLineNumber(offset) + 1; // 1-indexed
-                info.put("lineNumber", lineNumber);
+                lineNumber = document.getLineNumber(offset) + 1; // 1-indexed
             }
         }
 
@@ -245,8 +237,31 @@ public class CallHierarchyTool extends AbstractMcpTool {
             signature.append(parameters[i].getType().getPresentableText());
         }
         signature.append(")");
-        info.put("signature", signature.toString());
 
-        return info;
+        return new MethodInfo(name, className, filePath, lineNumber, signature.toString(), Collections.emptyList());
+    }
+
+    /**
+     * Response containing the call hierarchy for a method.
+     */
+    public record CallHierarchyResponse(MethodInfo method) {}
+
+    /**
+     * Information about a method in the call hierarchy.
+     */
+    public record MethodInfo(
+            String name,
+            String className,
+            String filePath,
+            Integer lineNumber,
+            String signature,
+            List<MethodInfo> callers
+    ) {
+        /**
+         * Returns a new MethodInfo with the given callers.
+         */
+        public MethodInfo withCallers(List<MethodInfo> callers) {
+            return new MethodInfo(name, className, filePath, lineNumber, signature, callers);
+        }
     }
 }

@@ -12,7 +12,7 @@ class McpToolRegistryTest {
     void createDefaultRegistersExpectedTools() {
         McpToolRegistry registry = McpToolRegistry.createDefault();
 
-        List<McpTool> tools = registry.getTools();
+        List<McpTool<?>> tools = registry.getTools();
         assertThat(tools).isNotNull();
         assertThat(tools).hasSizeGreaterThanOrEqualTo(2);
 
@@ -36,7 +36,7 @@ class McpToolRegistryTest {
     @Test
     void getToolsReturnsUnmodifiableList() {
         McpToolRegistry registry = McpToolRegistry.createDefault();
-        List<McpTool> tools = registry.getTools();
+        List<McpTool<?>> tools = registry.getTools();
 
         assertThatThrownBy(() -> tools.add(new ListProjectsTool()))
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -61,7 +61,7 @@ class McpToolRegistryTest {
     void registerCustomTool() {
         McpToolRegistry registry = new McpToolRegistry();
 
-        McpTool customTool = new AbstractMcpTool() {
+        McpTool<String> customTool = new AbstractMcpTool<String>() {
             @Override
             public String getName() {
                 return "custom_tool";
@@ -80,7 +80,7 @@ class McpToolRegistryTest {
             }
 
             @Override
-            public io.modelcontextprotocol.spec.McpSchema.CallToolResult execute(java.util.Map<String, Object> arguments) {
+            public McpTool.Result<ErrorResponse, String> execute(java.util.Map<String, Object> arguments) {
                 return successResult("Custom tool executed");
             }
         };

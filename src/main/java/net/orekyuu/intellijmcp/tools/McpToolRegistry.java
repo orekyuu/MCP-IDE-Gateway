@@ -15,7 +15,7 @@ public class McpToolRegistry {
 
     private static final Logger LOG = Logger.getInstance(McpToolRegistry.class);
 
-    private final List<McpTool> tools = new ArrayList<>();
+    private final List<McpTool<?>> tools = new ArrayList<>();
 
     /**
      * Creates a new registry with all default tools registered.
@@ -33,14 +33,14 @@ public class McpToolRegistry {
      *
      * @param tool the tool to register
      */
-    public void register(McpTool tool) {
+    public void register(McpTool<?> tool) {
         tools.add(tool);
     }
 
     /**
      * Returns an unmodifiable list of all registered tools.
      */
-    public List<McpTool> getTools() {
+    public List<McpTool<?>> getTools() {
         return Collections.unmodifiableList(tools);
     }
 
@@ -60,7 +60,7 @@ public class McpToolRegistry {
         LOG.info("Registering " + tools.size() + " MCP tools...");
 
         List<String> toolNames = new ArrayList<>();
-        for (McpTool tool : tools) {
+        for (McpTool<?> tool : tools) {
             server.addTool(tool.toSpecification());
             toolNames.add(tool.getName());
         }

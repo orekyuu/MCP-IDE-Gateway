@@ -15,22 +15,22 @@ import java.util.function.Supplier;
  * Abstract base class for MCP tools providing common helper methods.
  * Extend this class to create new MCP tools with minimal boilerplate.
  */
-public abstract class AbstractMcpTool implements McpTool {
+public abstract class AbstractMcpTool<RESPONSE> implements McpTool<RESPONSE> {
 
     // ========== Result helpers ==========
 
     /**
      * Creates a successful result with the given message.
      */
-    protected McpSchema.CallToolResult successResult(String message) {
-        return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(message)), false);
+    protected Result<ErrorResponse, RESPONSE> successResult(RESPONSE message) {
+        return Result.success(message);
     }
 
     /**
      * Creates an error result with the given message.
      */
-    protected McpSchema.CallToolResult errorResult(String message) {
-        return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(message)), true);
+    protected Result<ErrorResponse, RESPONSE> errorResult(String message) {
+        return Result.error(new ErrorResponse(message));
     }
 
     // ========== Threading helpers ==========
@@ -43,12 +43,12 @@ public abstract class AbstractMcpTool implements McpTool {
     }
 
     /**
-     * Runs the given computation in a read action and wraps the result in a CallToolResult.
+     * Runs the given computation in a read action and returns the result.
      * Catches exceptions and returns an error result.
      */
-    protected McpSchema.CallToolResult runReadActionWithResult(Supplier<McpSchema.CallToolResult> computation) {
+    protected Result<ErrorResponse, RESPONSE> runReadActionWithResult(Supplier<Result<ErrorResponse, RESPONSE>> computation) {
         return ApplicationManager.getApplication().runReadAction(
-                (Computable<McpSchema.CallToolResult>) computation::get
+                (Computable<Result<ErrorResponse, RESPONSE>>) computation::get
         );
     }
 
