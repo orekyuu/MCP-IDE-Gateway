@@ -118,7 +118,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
     private DefinitionInfo createDefinitionInfo(PsiElement element) {
         String name = null;
         String kind = "unknown";
-        String containerName = null;
+        String containingClass = null;
         String filePath = null;
         LineRange lineRange = null;
 
@@ -130,21 +130,21 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
         // Get kind and container
         if (element instanceof PsiClass psiClass) {
             kind = getClassKind(psiClass);
-            PsiClass containingClass = psiClass.getContainingClass();
-            if (containingClass != null) {
-                containerName = containingClass.getQualifiedName();
+            PsiClass parent = psiClass.getContainingClass();
+            if (parent != null) {
+                containingClass = parent.getQualifiedName();
             }
         } else if (element instanceof PsiMethod method) {
             kind = method.isConstructor() ? "constructor" : "method";
-            PsiClass containingClass = method.getContainingClass();
-            if (containingClass != null) {
-                containerName = containingClass.getQualifiedName();
+            PsiClass parent = method.getContainingClass();
+            if (parent != null) {
+                containingClass = parent.getQualifiedName();
             }
         } else if (element instanceof PsiField field) {
             kind = "field";
-            PsiClass containingClass = field.getContainingClass();
-            if (containingClass != null) {
-                containerName = containingClass.getQualifiedName();
+            PsiClass parent = field.getContainingClass();
+            if (parent != null) {
+                containingClass = parent.getQualifiedName();
             }
         } else if (element instanceof PsiParameter) {
             kind = "parameter";
@@ -179,7 +179,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
             return null;
         }
 
-        return new DefinitionInfo(name, kind, containerName, filePath, lineRange);
+        return new DefinitionInfo(name, kind, containingClass, filePath, lineRange);
     }
 
     private String getClassKind(PsiClass psiClass) {
@@ -201,7 +201,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
     public record DefinitionInfo(
             String name,
             String kind,
-            String containerName,
+            String containingClass,
             String filePath,
             LineRange lineRange
     ) {}
