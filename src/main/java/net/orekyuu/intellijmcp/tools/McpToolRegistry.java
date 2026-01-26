@@ -30,6 +30,7 @@ public class McpToolRegistry {
         registry.register(new GetDefinitionTool());
         registry.register(new FindUsagesTool());
         registry.register(new GetImplementationsTool());
+        registry.register(new GetDiagnosticsTool());
         return registry;
     }
 
