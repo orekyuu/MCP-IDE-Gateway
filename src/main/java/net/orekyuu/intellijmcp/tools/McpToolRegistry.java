@@ -28,6 +28,7 @@ public class McpToolRegistry {
         registry.register(new FindClassTool());
         registry.register(new GetClassStructureTool());
         registry.register(new GetDefinitionTool());
+        registry.register(new FindUsagesTool());
         return registry;
     }
 
