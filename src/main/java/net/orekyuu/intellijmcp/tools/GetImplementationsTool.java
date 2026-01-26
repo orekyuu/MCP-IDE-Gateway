@@ -1,0 +1,198 @@
+package net.orekyuu.intellijmcp.tools;
+
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.*;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.PsiShortNamesCache;
+import com.intellij.psi.search.searches.ClassInheritorsSearch;
+import io.modelcontextprotocol.spec.McpSchema;
+
+import java.util.*;
+
+/**
+ * MCP tool that finds all implementations of an interface or subclasses of a class.
+ */
+public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTool.GetImplementationsResponse> {
+
+    private static final Logger LOG = Logger.getInstance(GetImplementationsTool.class);
+
+    @Override
+    public String getName() {
+        return "get_implementations";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Get all implementations of an interface or subclasses of a class";
+    }
+
+    @Override
+    public McpSchema.JsonSchema getInputSchema() {
+        return JsonSchemaBuilder.object()
+                .requiredString("className", "The class or interface name to find implementations for (simple name or fully qualified name)")
+                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .optionalBoolean("includeAbstract", "Whether to include abstract classes in the results (default: true)")
+                .build();
+    }
+
+    @Override
+    public Result<ErrorResponse, GetImplementationsResponse> execute(Map<String, Object> arguments) {
+        try {
+            // Get arguments
+            String className;
+            try {
+                className = getRequiredStringArg(arguments, "className");
+            } catch (IllegalArgumentException e) {
+                return errorResult("Error: className is required");
+            }
+
+            Optional<String> projectName = getStringArg(arguments, "projectName");
+            boolean includeAbstract = getBooleanArg(arguments, "includeAbstract").orElse(true);
+
+            // Find project
+            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            if (projectOpt.isEmpty()) {
+                if (projectName.isPresent()) {
+                    return errorResult("Error: Project not found: " + projectName.get());
+                } else {
+                    return errorResult("Error: No open projects found");
+                }
+            }
+            Project project = projectOpt.get();
+
+            // Find the target class
+            PsiClass targetClass = runReadAction(() -> findClass(project, className));
+
+            if (targetClass == null) {
+                return errorResult("Error: Class not found: " + className);
+            }
+
+            // Get target class info
+            ClassInfo targetInfo = runReadAction(() -> createClassInfo(targetClass));
+
+            // Search for implementations using ReadAction.nonBlocking()
+            GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+            Collection<PsiClass> inheritors = ReadAction
+                    .nonBlocking(() -> ClassInheritorsSearch.search(targetClass, scope, true).findAll())
+                    .executeSynchronously();
+
+            // Convert to implementation info
+            List<ClassInfo> implementations = runReadAction(() -> {
+                List<ClassInfo> result = new ArrayList<>();
+                for (PsiClass inheritor : inheritors) {
+                    // Skip abstract classes if not included
+                    if (!includeAbstract && inheritor.hasModifierProperty(PsiModifier.ABSTRACT)) {
+                        continue;
+                    }
+                    ClassInfo info = createClassInfo(inheritor);
+                    if (info != null) {
+                        result.add(info);
+                    }
+                }
+                return result;
+            });
+
+            return successResult(new GetImplementationsResponse(targetInfo, implementations));
+
+        } catch (Exception e) {
+            LOG.error("Error in get_implementations tool", e);
+            return errorResult("Error: " + e.getMessage());
+        }
+    }
+
+    private PsiClass findClass(Project project, String className) {
+        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+
+        // Try fully qualified name first
+        if (className.contains(".")) {
+            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
+            if (classes.length > 0) {
+                return classes[0];
+            }
+        }
+
+        // Try simple name
+        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
+        if (classes.length > 0) {
+            return classes[0];
+        }
+
+        return null;
+    }
+
+    private ClassInfo createClassInfo(PsiClass psiClass) {
+        String name = psiClass.getName();
+        String qualifiedName = psiClass.getQualifiedName();
+        String classType = getClassType(psiClass);
+        String filePath = null;
+        LineRange lineRange = null;
+        List<String> modifiers = getModifiers(psiClass.getModifierList());
+
+        PsiFile containingFile = psiClass.getContainingFile();
+        if (containingFile != null) {
+            VirtualFile virtualFile = containingFile.getVirtualFile();
+            if (virtualFile != null) {
+                filePath = virtualFile.getPath();
+            }
+
+            var textRange = psiClass.getTextRange();
+            if (textRange != null) {
+                com.intellij.openapi.editor.Document document =
+                        PsiDocumentManager.getInstance(psiClass.getProject()).getDocument(containingFile);
+                if (document != null) {
+                    int startLine = document.getLineNumber(textRange.getStartOffset()) + 1;
+                    int endLine = document.getLineNumber(textRange.getEndOffset()) + 1;
+                    lineRange = new LineRange(startLine, endLine);
+                }
+            }
+        }
+
+        return new ClassInfo(name, qualifiedName, classType, filePath, lineRange, modifiers);
+    }
+
+    private List<String> getModifiers(PsiModifierList modifierList) {
+        List<String> modifiers = new ArrayList<>();
+        if (modifierList == null) {
+            return modifiers;
+        }
+
+        if (modifierList.hasModifierProperty(PsiModifier.PUBLIC)) modifiers.add("public");
+        if (modifierList.hasModifierProperty(PsiModifier.PROTECTED)) modifiers.add("protected");
+        if (modifierList.hasModifierProperty(PsiModifier.PRIVATE)) modifiers.add("private");
+        if (modifierList.hasModifierProperty(PsiModifier.ABSTRACT)) modifiers.add("abstract");
+        if (modifierList.hasModifierProperty(PsiModifier.FINAL)) modifiers.add("final");
+
+        return modifiers;
+    }
+
+    private String getClassType(PsiClass psiClass) {
+        if (psiClass.isInterface()) {
+            return "interface";
+        } else if (psiClass.isEnum()) {
+            return "enum";
+        } else if (psiClass.isRecord()) {
+            return "record";
+        } else if (psiClass.isAnnotationType()) {
+            return "annotation";
+        } else {
+            return "class";
+        }
+    }
+
+    public record GetImplementationsResponse(
+            ClassInfo target,
+            List<ClassInfo> implementations
+    ) {}
+
+    public record ClassInfo(
+            String name,
+            String qualifiedName,
+            String classType,
+            String filePath,
+            LineRange lineRange,
+            List<String> modifiers
+    ) {}
+}
