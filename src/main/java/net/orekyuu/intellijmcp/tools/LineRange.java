@@ -6,5 +6,10 @@ package net.orekyuu.intellijmcp.tools;
  */
 public record LineRange(
         int startLine,
-        int endLine
-) {}
+        int endLine,
+        int lineCount
+) {
+    public LineRange(int startLine, int endLine) {
+        this(startLine, endLine, endLine - startLine + 1);
+    }
+}
