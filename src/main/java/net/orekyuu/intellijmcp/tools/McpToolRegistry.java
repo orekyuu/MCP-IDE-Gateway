@@ -35,6 +35,8 @@ public class McpToolRegistry {
         registry.register(new GetTypeHierarchyTool());
         registry.register(new GetDocumentationTool());
         registry.register(new OptimizeImportsTool());
+        registry.register(new RenameSymbolTool());
+        registry.register(new ExtractMethodTool());
         return registry;
     }
 
