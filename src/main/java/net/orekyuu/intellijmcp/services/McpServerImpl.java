@@ -31,6 +31,7 @@ public class McpServerImpl {
 
     public void start() throws IOException {
         LOG.info("Initializing MCP Server with HTTP/SSE transport...");
+        logService().info("Initializing MCP Server with HTTP/SSE transport...");
 
         try {
             // Create transport provider
@@ -76,10 +77,20 @@ public class McpServerImpl {
             LOG.info("Message endpoint: http://localhost:" + DEFAULT_PORT + "/mcp/message");
             LOG.info("MCP tools registered via McpToolRegistry");
 
+            logService().info("MCP Server initialized and started successfully");
+            logService().info("HTTP/SSE endpoint: http://localhost:" + DEFAULT_PORT);
+            logService().info("SSE endpoint: http://localhost:" + DEFAULT_PORT + "/sse");
+            logService().info("Message endpoint: http://localhost:" + DEFAULT_PORT + "/mcp/message");
+
         } catch (Exception e) {
             LOG.error("Failed to initialize MCP Server", e);
+            logService().error("Failed to initialize MCP Server: " + e.getMessage());
             throw new IOException("Failed to initialize MCP Server", e);
         }
+    }
+
+    private McpServerLogService logService() {
+        return McpServerLogService.getInstance();
     }
 
     private void startJettyServer(HttpServletSseServerTransportProvider transportProvider) throws Exception {
@@ -89,7 +100,6 @@ public class McpServerImpl {
         // Create servlet context
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
-        jettyServer.setHandler(context);
 
         // Add MCP transport as servlet
         // HttpServletSseServerTransportProvider extends HttpServlet
@@ -100,21 +110,25 @@ public class McpServerImpl {
         jettyServer.start();
 
         LOG.info("Jetty HTTP server started on port " + DEFAULT_PORT);
+        logService().info("Jetty HTTP server started on port " + DEFAULT_PORT);
     }
 
 
     private void registerTools(McpSyncServer server) {
         McpToolRegistry registry = McpToolRegistry.createDefault();
         registry.registerAllWithServer(server);
+        logService().info("Registered " + registry.size() + " MCP tools");
     }
 
     public void stop() {
         LOG.info("Stopping MCP Server...");
+        logService().info("Stopping MCP Server...");
         try {
             // Stop Jetty server
             if (jettyServer != null && jettyServer.isStarted()) {
                 jettyServer.stop();
                 LOG.info("Jetty HTTP server stopped");
+                logService().info("Jetty HTTP server stopped");
             }
 
             // Close MCP server
@@ -132,8 +146,10 @@ public class McpServerImpl {
             }
 
             LOG.info("MCP Server stopped successfully");
+            logService().info("MCP Server stopped successfully");
         } catch (Exception e) {
             LOG.error("Error while stopping MCP Server", e);
+            logService().error("Error while stopping MCP Server: " + e.getMessage());
         }
     }
 }

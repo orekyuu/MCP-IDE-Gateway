@@ -2,6 +2,7 @@ package net.orekyuu.intellijmcp.tools;
 
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.services.McpServerLogService;
 
 import java.util.List;
 import java.util.Map;
@@ -63,18 +64,32 @@ public interface McpTool<RESPONSE> {
         return new McpServerFeatures.SyncToolSpecification(
                 tool,
                 (exchange, arguments) -> {
+                    McpServerLogService logService = McpServerLogService.getInstance();
+                    String toolName = getName();
+
+                    // Log request
+                    logService.info("Tool call: " + toolName);
+                    logService.info("  Request: " + ResponseSerializer.serialize(arguments));
+
                     Result<ErrorResponse, RESPONSE> result = execute(arguments);
+
+                    // Log response
                     return switch (result) {
-                        case Result.ErrorResponse<ErrorResponse, RESPONSE> err ->
-                                new McpSchema.CallToolResult(
-                                        List.of(new McpSchema.TextContent(err.message().message())),
-                                        true
-                                );
-                        case Result.SuccessResponse<ErrorResponse, RESPONSE> success ->
-                                new McpSchema.CallToolResult(
-                                        List.of(new McpSchema.TextContent(ResponseSerializer.serialize(success.message()))),
-                                        false
-                                );
+                        case Result.ErrorResponse<ErrorResponse, RESPONSE> err -> {
+                            logService.error("  Response (error): " + err.message().message());
+                            yield new McpSchema.CallToolResult(
+                                    List.of(new McpSchema.TextContent(err.message().message())),
+                                    true
+                            );
+                        }
+                        case Result.SuccessResponse<ErrorResponse, RESPONSE> success -> {
+                            String responseBody = ResponseSerializer.serialize(success.message());
+                            logService.info("  Response: " + responseBody);
+                            yield new McpSchema.CallToolResult(
+                                    List.of(new McpSchema.TextContent(responseBody)),
+                                    false
+                            );
+                        }
                     };
                 }
         );

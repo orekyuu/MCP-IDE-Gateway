@@ -21,6 +21,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
             serviceImplementation="net.orekyuu.intellijmcp.services.McpServerService"/>
+        <applicationService
+            serviceImplementation="net.orekyuu.intellijmcp.services.McpServerLogService"/>
+        <toolWindow id="MCP Server"
+                    anchor="bottom"
+                    factoryClass="net.orekyuu.intellijmcp.ui.McpServerToolWindowFactory"
+                    icon="AllIcons.Actions.Execute"/>
     </extensions>
 
     <applicationListeners>
