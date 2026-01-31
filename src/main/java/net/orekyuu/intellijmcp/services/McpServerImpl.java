@@ -108,7 +108,8 @@ public class McpServerImpl {
         ServletHolder servletHolder = new ServletHolder(transportProvider);
         context.addServlet(servletHolder, "/*");
 
-        // Start the server
+        // Set handler and start the server
+        jettyServer.setHandler(context);
         jettyServer.start();
 
         LOG.info("Jetty HTTP server started on port " + port);

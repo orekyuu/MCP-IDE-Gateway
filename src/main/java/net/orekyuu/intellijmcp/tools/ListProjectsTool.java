@@ -1,13 +1,12 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import io.modelcontextprotocol.spec.McpSchema;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +40,12 @@ public class ListProjectsTool extends AbstractMcpTool<ListProjectsTool.ListProje
             try {
                 Project[] projects = getOpenProjects();
                 var projectInfoList = Arrays.stream(projects)
-                      .map(p -> new ListProjectsResponse.ProjectInfo(p.getName(), p.getBasePath(), p.getLocationHash()))
+                      .map(p -> new ListProjectsResponse.ProjectInfo(
+                              p.getName(),
+                              p.getBasePath(),
+                              getGitRemote(p.getBasePath()),
+                              getGitBranch(p.getBasePath())
+                      ))
                       .toList();
 
                 return successResult(new ListProjectsResponse(projectInfoList));
@@ -52,7 +56,43 @@ public class ListProjectsTool extends AbstractMcpTool<ListProjectsTool.ListProje
         });
     }
 
+    private String getGitRemote(String basePath) {
+        if (basePath == null) return null;
+        try {
+            ProcessBuilder pb = new ProcessBuilder("git", "remote", "get-url", "origin");
+            pb.directory(new File(basePath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line = reader.readLine();
+                process.waitFor();
+                return process.exitValue() == 0 ? line : null;
+            }
+        } catch (Exception e) {
+            LOG.debug("Failed to get git remote for " + basePath, e);
+            return null;
+        }
+    }
+
+    private String getGitBranch(String basePath) {
+        if (basePath == null) return null;
+        try {
+            ProcessBuilder pb = new ProcessBuilder("git", "branch", "--show-current");
+            pb.directory(new File(basePath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line = reader.readLine();
+                process.waitFor();
+                return process.exitValue() == 0 ? line : null;
+            }
+        } catch (Exception e) {
+            LOG.debug("Failed to get git branch for " + basePath, e);
+            return null;
+        }
+    }
+
     public record ListProjectsResponse(List<ProjectInfo> projects) {
-      public record ProjectInfo(String name, String basePath, String locationHash) {}
+      public record ProjectInfo(String name, String basePath, String gitRemote, String gitBranch) {}
     }
 }
