@@ -23,6 +23,13 @@
             serviceImplementation="net.orekyuu.intellijmcp.services.McpServerService"/>
         <applicationService
             serviceImplementation="net.orekyuu.intellijmcp.services.McpServerLogService"/>
+        <applicationService
+            serviceImplementation="net.orekyuu.intellijmcp.settings.McpServerSettings"/>
+        <applicationConfigurable
+            parentId="tools"
+            instance="net.orekyuu.intellijmcp.settings.McpServerSettingsConfigurable"
+            id="net.orekyuu.intellijmcp.settings.McpServerSettingsConfigurable"
+            displayName="MCP Server"/>
         <toolWindow id="MCP Server"
                     anchor="bottom"
                     factoryClass="net.orekyuu.intellijmcp.ui.McpServerToolWindowFactory"

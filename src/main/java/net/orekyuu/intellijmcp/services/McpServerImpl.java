@@ -8,6 +8,7 @@ import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletSseServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.settings.McpServerSettings;
 import net.orekyuu.intellijmcp.tools.McpToolRegistry;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -23,15 +24,16 @@ import java.time.Duration;
  */
 public class McpServerImpl {
     private static final Logger LOG = Logger.getInstance(McpServerImpl.class);
-    private static final int DEFAULT_PORT = 3000;
 
     private McpSyncServer mcpServer;
     private Server jettyServer;
     private Thread shutdownHook;
+    private int port;
 
     public void start() throws IOException {
-        LOG.info("Initializing MCP Server with HTTP/SSE transport...");
-        logService().info("Initializing MCP Server with HTTP/SSE transport...");
+        port = McpServerSettings.getInstance().getPort();
+        LOG.info("Initializing MCP Server with HTTP/SSE transport on port " + port + "...");
+        logService().info("Initializing MCP Server with HTTP/SSE transport on port " + port + "...");
 
         try {
             // Create transport provider
@@ -72,15 +74,15 @@ public class McpServerImpl {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
 
             LOG.info("MCP Server initialized and started successfully");
-            LOG.info("HTTP/SSE endpoint: http://localhost:" + DEFAULT_PORT);
-            LOG.info("SSE endpoint: http://localhost:" + DEFAULT_PORT + "/sse");
-            LOG.info("Message endpoint: http://localhost:" + DEFAULT_PORT + "/mcp/message");
+            LOG.info("HTTP/SSE endpoint: http://localhost:" + port);
+            LOG.info("SSE endpoint: http://localhost:" + port + "/sse");
+            LOG.info("Message endpoint: http://localhost:" + port + "/mcp/message");
             LOG.info("MCP tools registered via McpToolRegistry");
 
             logService().info("MCP Server initialized and started successfully");
-            logService().info("HTTP/SSE endpoint: http://localhost:" + DEFAULT_PORT);
-            logService().info("SSE endpoint: http://localhost:" + DEFAULT_PORT + "/sse");
-            logService().info("Message endpoint: http://localhost:" + DEFAULT_PORT + "/mcp/message");
+            logService().info("HTTP/SSE endpoint: http://localhost:" + port);
+            logService().info("SSE endpoint: http://localhost:" + port + "/sse");
+            logService().info("Message endpoint: http://localhost:" + port + "/mcp/message");
 
         } catch (Exception e) {
             LOG.error("Failed to initialize MCP Server", e);
@@ -95,7 +97,7 @@ public class McpServerImpl {
 
     private void startJettyServer(HttpServletSseServerTransportProvider transportProvider) throws Exception {
         // Create Jetty server
-        jettyServer = new Server(DEFAULT_PORT);
+        jettyServer = new Server(port);
 
         // Create servlet context
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
@@ -109,8 +111,8 @@ public class McpServerImpl {
         // Start the server
         jettyServer.start();
 
-        LOG.info("Jetty HTTP server started on port " + DEFAULT_PORT);
-        logService().info("Jetty HTTP server started on port " + DEFAULT_PORT);
+        LOG.info("Jetty HTTP server started on port " + port);
+        logService().info("Jetty HTTP server started on port " + port);
     }
 
 

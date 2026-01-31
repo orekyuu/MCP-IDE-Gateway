@@ -10,6 +10,7 @@ import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.util.messages.MessageBusConnection;
 import net.orekyuu.intellijmcp.services.McpServerLogService;
+import net.orekyuu.intellijmcp.services.McpServerService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -35,6 +36,10 @@ public class ServerLogPanel implements Disposable {
 
         // Add toolbar
         DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(new StartServerAction());
+        actionGroup.add(new StopServerAction());
+        actionGroup.add(new RestartServerAction());
+        actionGroup.addSeparator();
         actionGroup.add(new ClearLogAction());
         ActionToolbar toolbar = ActionManager.getInstance()
                 .createActionToolbar("McpServerLog", actionGroup, false);
@@ -91,6 +96,71 @@ public class ServerLogPanel implements Disposable {
     @Override
     public void dispose() {
         // Connection is disposed automatically since we passed 'this' as parent
+    }
+
+    private class StartServerAction extends AnAction {
+        StartServerAction() {
+            super("Start Server", "Start MCP server", com.intellij.icons.AllIcons.Actions.Execute);
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            McpServerService.getInstance().startServer();
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            e.getPresentation().setEnabled(!McpServerService.getInstance().isRunning());
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.BGT;
+        }
+    }
+
+    private class StopServerAction extends AnAction {
+        StopServerAction() {
+            super("Stop Server", "Stop MCP server", com.intellij.icons.AllIcons.Actions.Suspend);
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            McpServerService.getInstance().stopServer();
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            e.getPresentation().setEnabled(McpServerService.getInstance().isRunning());
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.BGT;
+        }
+    }
+
+    private class RestartServerAction extends AnAction {
+        RestartServerAction() {
+            super("Restart Server", "Restart MCP server", com.intellij.icons.AllIcons.Actions.Restart);
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            McpServerService service = McpServerService.getInstance();
+            service.stopServer();
+            service.startServer();
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            e.getPresentation().setEnabled(McpServerService.getInstance().isRunning());
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.BGT;
+        }
     }
 
     private class ClearLogAction extends AnAction {
