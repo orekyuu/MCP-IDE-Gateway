@@ -40,7 +40,7 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
                 .requiredInteger("line", "Line number where the symbol is located (1-based)")
                 .requiredInteger("column", "Column number where the symbol is located (1-based)")
                 .requiredString("newName", "The new name for the symbol")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -52,6 +52,7 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
             int line;
             int column;
             String newName;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
                 line = getIntegerArg(arguments, "line")
@@ -59,20 +60,15 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
                 column = getIntegerArg(arguments, "column")
                         .orElseThrow(() -> new IllegalArgumentException("column is required"));
                 newName = getRequiredStringArg(arguments, "newName");
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
-
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

@@ -40,7 +40,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
         return JsonSchemaBuilder.object()
                 .requiredString("filePath", "Absolute path to the file containing the method")
                 .requiredInteger("offset", "Character offset position in the file where the method is located")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalInteger("depth", "Maximum depth of the hierarchy to retrieve (default: 3, max: 10)")
                 .build();
     }
@@ -51,26 +51,23 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
             // Get arguments
             String filePath;
             int offset;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
                 offset = getIntegerArg(arguments, "offset")
                         .orElseThrow(() -> new IllegalArgumentException("offset is required"));
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
             int depth = getIntegerArg(arguments, "depth").orElse(DEFAULT_DEPTH);
             depth = Math.min(depth, MAX_DEPTH);
 
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

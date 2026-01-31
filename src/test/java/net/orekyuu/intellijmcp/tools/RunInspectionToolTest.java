@@ -35,21 +35,31 @@ public class RunInspectionToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("filePath")
-                .containsKey("projectName")
+                .containsKey("projectPath")
                 .containsKey("inspectionName");
-        // All parameters are optional
-        assertThat(schema.required()).isNullOrEmpty();
+        assertThat(schema.required())
+                .isNotNull()
+                .contains("projectPath");
     }
 
-    public void testExecuteReturnsResponse() {
+    public void testExecuteWithMissingProjectPath() {
         var result = tool.execute(Map.of());
 
         assertThat(result).isNotNull();
-        // Should return success even with no open projects (will be handled gracefully)
-        assertThat(result).isInstanceOfAny(
-                McpTool.Result.SuccessResponse.class,
-                McpTool.Result.ErrorResponse.class
-        );
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, RunInspectionTool.InspectionResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
+    }
+
+    public void testExecuteWithNonExistentProject() {
+        var result = tool.execute(Map.of("projectPath", "/nonexistent/project/path"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, RunInspectionTool.InspectionResponse>) result;
+        assertThat(errorResult.message().message()).contains("Project not found at path");
     }
 
     public void testToSpecification() {

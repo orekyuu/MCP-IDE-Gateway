@@ -36,14 +36,14 @@ public class GetDefinitionToolTest extends BasePlatformTestCase {
                 .isNotNull()
                 .containsKey("filePath")
                 .containsKey("offset")
-                .containsKey("projectName");
+                .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath", "offset");
+                .contains("filePath", "offset", "projectPath");
     }
 
     public void testExecuteWithMissingFilePath() {
-        var result = tool.execute(Map.of("offset", 0));
+        var result = tool.execute(Map.of("offset", 0, "projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
@@ -53,7 +53,7 @@ public class GetDefinitionToolTest extends BasePlatformTestCase {
     }
 
     public void testExecuteWithMissingOffset() {
-        var result = tool.execute(Map.of("filePath", "/some/path.java"));
+        var result = tool.execute(Map.of("filePath", "/some/path.java", "projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
@@ -62,10 +62,21 @@ public class GetDefinitionToolTest extends BasePlatformTestCase {
         assertThat(errorResult.message().message()).contains("offset");
     }
 
-    public void testExecuteWithNonExistentFile() {
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of("filePath", "/some/path.java", "offset", 0));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDefinitionTool.GetDefinitionResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
+    }
+
+    public void testExecuteWithNonExistentProject() {
         var result = tool.execute(Map.of(
                 "filePath", "/nonexistent/path/to/file.java",
-                "offset", 0
+                "offset", 0,
+                "projectPath", "/nonexistent/project/path"
         ));
 
         assertThat(result).isNotNull();

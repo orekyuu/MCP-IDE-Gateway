@@ -35,20 +35,30 @@ public class OptimizeImportsToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("filePath")
-                .containsKey("projectName");
+                .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath");
+                .contains("filePath", "projectPath");
     }
 
     public void testExecuteWithMissingFilePath() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OptimizeImportsTool.OptimizeImportsResponse>) result;
         assertThat(errorResult.message().message()).contains("filePath");
+    }
+
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of("filePath", "/some/file.java"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OptimizeImportsTool.OptimizeImportsResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
     }
 
     public void testToSpecification() {

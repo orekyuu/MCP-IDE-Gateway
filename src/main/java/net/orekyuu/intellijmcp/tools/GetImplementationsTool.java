@@ -33,7 +33,7 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
                 .requiredString("className", "The class or interface name to find implementations for (simple name or fully qualified name)")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalBoolean("includeAbstract", "Whether to include abstract classes in the results (default: true)")
                 .build();
     }
@@ -43,23 +43,20 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
         try {
             // Get arguments
             String className;
+            String projectPath;
             try {
                 className = getRequiredStringArg(arguments, "className");
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
-                return errorResult("Error: className is required");
+                return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
             boolean includeAbstract = getBooleanArg(arguments, "includeAbstract").orElse(true);
 
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

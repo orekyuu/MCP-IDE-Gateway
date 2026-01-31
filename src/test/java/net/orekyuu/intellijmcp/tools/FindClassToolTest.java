@@ -36,17 +36,16 @@ public class FindClassToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("className")
-                .containsKey("projectName")
+                .containsKey("projectPath")
                 .containsKey("includeLibraries");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("className")
-                .doesNotContain("projectName")
+                .contains("className", "projectPath")
                 .doesNotContain("includeLibraries");
     }
 
     public void testExecuteWithMissingClassName() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
@@ -55,19 +54,27 @@ public class FindClassToolTest extends BasePlatformTestCase {
         assertThat(errorResult.message().message()).contains("className");
     }
 
-    public void testExecuteWithNonExistentClass() {
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of("className", "SomeClass"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, FindClassTool.FindClassResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
+    }
+
+    public void testExecuteWithNonExistentProject() {
         var result = tool.execute(Map.of(
-                "className", "NonExistentClassName12345"
+                "className", "NonExistentClassName12345",
+                "projectPath", "/nonexistent/project/path"
         ));
 
         assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.SuccessResponse.class);
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        var successResult = (McpTool.Result.SuccessResponse<ErrorResponse, FindClassTool.FindClassResponse>) result;
-        FindClassTool.FindClassResponse response = successResult.message();
-
-        assertThat(response.searchQuery()).isEqualTo("NonExistentClassName12345");
-        assertThat(response.classes()).isEmpty();
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, FindClassTool.FindClassResponse>) result;
+        assertThat(errorResult.message().message()).contains("Project not found at path");
     }
 
     public void testToSpecification() {

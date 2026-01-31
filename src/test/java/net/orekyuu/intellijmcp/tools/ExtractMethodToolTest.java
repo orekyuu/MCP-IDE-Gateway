@@ -38,20 +38,35 @@ public class ExtractMethodToolTest extends BasePlatformTestCase {
                 .containsKey("startLine")
                 .containsKey("endLine")
                 .containsKey("methodName")
-                .containsKey("projectName");
+                .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath", "startLine", "endLine", "methodName");
+                .contains("filePath", "startLine", "endLine", "methodName", "projectPath");
     }
 
     public void testExecuteWithMissingFilePath() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, ExtractMethodTool.ExtractMethodResponse>) result;
         assertThat(errorResult.message().message()).contains("filePath");
+    }
+
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of(
+                "filePath", "/some/file.java",
+                "startLine", 1,
+                "endLine", 5,
+                "methodName", "newMethod"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, ExtractMethodTool.ExtractMethodResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
     }
 
     public void testToSpecification() {

@@ -37,7 +37,7 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
         return JsonSchemaBuilder.object()
                 .requiredString("filePath", "Absolute path to the file containing the symbol")
                 .requiredInteger("offset", "Character offset position in the file where the symbol is located")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -47,24 +47,20 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
             // Get arguments
             String filePath;
             int offset;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
                 offset = getIntegerArg(arguments, "offset")
                         .orElseThrow(() -> new IllegalArgumentException("offset is required"));
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
-
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

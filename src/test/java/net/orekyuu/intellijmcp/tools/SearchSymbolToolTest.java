@@ -35,15 +35,15 @@ public class SearchSymbolToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("query")
-                .containsKey("projectName")
+                .containsKey("projectPath")
                 .containsKey("symbolType");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("query");
+                .contains("query", "projectPath");
     }
 
     public void testExecuteWithMissingQuery() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
@@ -52,17 +52,24 @@ public class SearchSymbolToolTest extends BasePlatformTestCase {
         assertThat(errorResult.message().message()).contains("query");
     }
 
-    public void testExecuteWithQuery() {
+    public void testExecuteWithMissingProjectPath() {
         var result = tool.execute(Map.of("query", "test"));
 
         assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.SuccessResponse.class);
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        var successResult = (McpTool.Result.SuccessResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
-        SearchSymbolTool.SearchSymbolResponse response = successResult.message();
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
+    }
 
-        assertThat(response.query()).isEqualTo("test");
-        assertThat(response.symbols()).isNotNull();
+    public void testExecuteWithNonExistentProject() {
+        var result = tool.execute(Map.of("query", "test", "projectPath", "/nonexistent/project/path"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
+        assertThat(errorResult.message().message()).contains("Project not found at path");
     }
 
     public void testToSpecification() {

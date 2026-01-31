@@ -70,15 +70,20 @@ public abstract class AbstractMcpTool<RESPONSE> implements McpTool<RESPONSE> {
     }
 
     /**
-     * Finds an open project by name.
+     * Finds an open project by its base path.
      *
-     * @param projectName the name of the project to find
+     * @param projectPath the absolute path to the project root directory
      * @return Optional containing the project if found
      */
-    protected Optional<Project> findProjectByName(String projectName) {
+    protected Optional<Project> findProjectByPath(String projectPath) {
+        if (projectPath == null || projectPath.isEmpty()) {
+            return Optional.empty();
+        }
+        String normalizedPath = normalizePath(projectPath);
         Project[] projects = getOpenProjects();
         for (Project project : projects) {
-            if (project.getName().equals(projectName)) {
+            String basePath = project.getBasePath();
+            if (basePath != null && normalizePath(basePath).equals(normalizedPath)) {
                 return Optional.of(project);
             }
         }
@@ -86,21 +91,17 @@ public abstract class AbstractMcpTool<RESPONSE> implements McpTool<RESPONSE> {
     }
 
     /**
-     * Finds a project by name, or returns the first open project if name is null/empty.
+     * Normalizes a path by removing trailing slashes.
      *
-     * @param projectName the name of the project (optional)
-     * @return Optional containing the project
+     * @param path the path to normalize
+     * @return the normalized path
      */
-    protected Optional<Project> findProjectOrFirst(String projectName) {
-        Project[] projects = getOpenProjects();
-
-        if (projectName != null && !projectName.isEmpty()) {
-            return findProjectByName(projectName);
-        } else if (projects.length > 0) {
-            return Optional.of(projects[0]);
+    private String normalizePath(String path) {
+        if (path == null) return null;
+        while (path.endsWith("/") || path.endsWith("\\")) {
+            path = path.substring(0, path.length() - 1);
         }
-
-        return Optional.empty();
+        return path;
     }
 
     // ========== Argument helpers ==========

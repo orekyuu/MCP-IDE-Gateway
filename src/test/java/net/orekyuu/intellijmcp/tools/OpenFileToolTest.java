@@ -36,11 +36,10 @@ public class OpenFileToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("filePath")
-                .containsKey("projectName");
+                .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath")
-                .doesNotContain("projectName");
+                .contains("filePath", "projectPath");
     }
 
     public void testExecuteWithMissingFilePath() {
@@ -55,7 +54,8 @@ public class OpenFileToolTest extends BasePlatformTestCase {
 
     public void testExecuteWithNonExistentFile() {
         var result = tool.execute(Map.of(
-                "filePath", "/nonexistent/path/to/file.java"
+                "filePath", "/nonexistent/path/to/file.java",
+                "projectPath", "/some/project"
         ));
 
         assertThat(result).isNotNull();
@@ -65,17 +65,17 @@ public class OpenFileToolTest extends BasePlatformTestCase {
         assertThat(errorResult.message().message()).containsIgnoringCase("not found");
     }
 
-    public void testExecuteWithInvalidProjectName() {
+    public void testExecuteWithInvalidProjectPath() {
         var result = tool.execute(Map.of(
                 "filePath", "/some/test/file.java",
-                "projectName", "NonExistentProject"
+                "projectPath", "/nonexistent/project/path"
         ));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, OpenFileTool.OpenFileResponse>) result;
-        assertThat(errorResult.message().message()).contains("Project not found");
+        assertThat(errorResult.message().message()).contains("Project not found at path");
     }
 
     public void testToSpecification() {

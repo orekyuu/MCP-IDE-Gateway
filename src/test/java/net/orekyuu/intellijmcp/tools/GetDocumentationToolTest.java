@@ -35,20 +35,30 @@ public class GetDocumentationToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("symbolName")
-                .containsKey("projectName");
+                .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("symbolName");
+                .contains("symbolName", "projectPath");
     }
 
     public void testExecuteWithMissingSymbolName() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDocumentationTool.DocumentationResponse>) result;
         assertThat(errorResult.message().message()).contains("symbolName");
+    }
+
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of("symbolName", "SomeSymbol"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDocumentationTool.DocumentationResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
     }
 
     public void testToSpecification() {

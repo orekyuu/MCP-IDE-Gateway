@@ -33,7 +33,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
                 .requiredString("symbolName", "The symbol name to get documentation for (class name, or class.method/field)")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -43,22 +43,18 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             try {
                 // Get arguments
                 String symbolName;
+                String projectPath;
                 try {
                     symbolName = getRequiredStringArg(arguments, "symbolName");
+                    projectPath = getRequiredStringArg(arguments, "projectPath");
                 } catch (IllegalArgumentException e) {
-                    return errorResult("Error: symbolName is required");
+                    return errorResult("Error: " + e.getMessage());
                 }
 
-                Optional<String> projectName = getStringArg(arguments, "projectName");
-
                 // Find project
-                Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+                Optional<Project> projectOpt = findProjectByPath(projectPath);
                 if (projectOpt.isEmpty()) {
-                    if (projectName.isPresent()) {
-                        return errorResult("Error: Project not found: " + projectName.get());
-                    } else {
-                        return errorResult("Error: No open projects found");
-                    }
+                    return errorResult("Error: Project not found at path: " + projectPath);
                 }
                 Project project = projectOpt.get();
 

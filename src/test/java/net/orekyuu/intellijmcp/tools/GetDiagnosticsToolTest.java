@@ -34,24 +34,31 @@ public class GetDiagnosticsToolTest extends BasePlatformTestCase {
         assertThat(schema.type()).isEqualTo("object");
         assertThat(schema.properties())
                 .isNotNull()
-                .containsKey("projectName")
+                .containsKey("projectPath")
                 .containsKey("errorsOnly");
-        // No required parameters
-        assertThat(schema.required()).isNullOrEmpty();
+        assertThat(schema.required())
+                .isNotNull()
+                .contains("projectPath");
     }
 
-    public void testExecuteReturnsResponse() {
+    public void testExecuteWithMissingProjectPath() {
         var result = tool.execute(Map.of());
 
         assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.SuccessResponse.class);
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
-        var successResult = (McpTool.Result.SuccessResponse<ErrorResponse, GetDiagnosticsTool.GetDiagnosticsResponse>) result;
-        GetDiagnosticsTool.GetDiagnosticsResponse response = successResult.message();
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDiagnosticsTool.GetDiagnosticsResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
+    }
 
-        assertThat(response.totalErrors()).isGreaterThanOrEqualTo(0);
-        assertThat(response.totalWarnings()).isGreaterThanOrEqualTo(0);
-        assertThat(response.files()).isNotNull();
+    public void testExecuteWithNonExistentProject() {
+        var result = tool.execute(Map.of("projectPath", "/nonexistent/project/path"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDiagnosticsTool.GetDiagnosticsResponse>) result;
+        assertThat(errorResult.message().message()).contains("Project not found at path");
     }
 
     public void testToSpecification() {

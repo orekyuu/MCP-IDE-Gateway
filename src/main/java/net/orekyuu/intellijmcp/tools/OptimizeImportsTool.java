@@ -37,7 +37,7 @@ public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.Opt
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
                 .requiredString("filePath", "Absolute path to the file to optimize imports")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -46,22 +46,18 @@ public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.Opt
         try {
             // Get arguments
             String filePath;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
-                return errorResult("Error: filePath is required");
+                return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
-
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

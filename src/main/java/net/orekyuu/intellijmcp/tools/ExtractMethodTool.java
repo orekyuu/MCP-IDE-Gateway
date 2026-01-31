@@ -46,7 +46,7 @@ public class ExtractMethodTool extends AbstractMcpTool<ExtractMethodTool.Extract
                 .requiredInteger("startLine", "Start line of the code to extract (1-based)")
                 .requiredInteger("endLine", "End line of the code to extract (1-based)")
                 .requiredString("methodName", "Name for the new method")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -58,6 +58,7 @@ public class ExtractMethodTool extends AbstractMcpTool<ExtractMethodTool.Extract
             int startLine;
             int endLine;
             String methodName;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
                 startLine = getIntegerArg(arguments, "startLine")
@@ -65,20 +66,15 @@ public class ExtractMethodTool extends AbstractMcpTool<ExtractMethodTool.Extract
                 endLine = getIntegerArg(arguments, "endLine")
                         .orElseThrow(() -> new IllegalArgumentException("endLine is required"));
                 methodName = getRequiredStringArg(arguments, "methodName");
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
             }
 
-            Optional<String> projectName = getStringArg(arguments, "projectName");
-
             // Find project
-            Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> projectOpt = findProjectByPath(projectPath);
             if (projectOpt.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
             Project project = projectOpt.get();
 

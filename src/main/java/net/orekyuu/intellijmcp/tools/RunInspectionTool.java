@@ -38,7 +38,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
                 .optionalString("filePath", "Absolute path to a specific file to inspect (optional, inspects entire project if not specified)")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalString("inspectionName", "Name of a specific inspection to run (optional, runs all enabled inspections if not specified)")
                 .build();
     }
@@ -48,17 +48,18 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         return runReadActionWithResult(() -> {
             try {
                 Optional<String> filePath = getStringArg(arguments, "filePath");
-                Optional<String> projectName = getStringArg(arguments, "projectName");
+                String projectPath;
+                try {
+                    projectPath = getRequiredStringArg(arguments, "projectPath");
+                } catch (IllegalArgumentException e) {
+                    return errorResult("Error: projectPath is required");
+                }
                 Optional<String> inspectionName = getStringArg(arguments, "inspectionName");
 
                 // Find project
-                Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+                Optional<Project> projectOpt = findProjectByPath(projectPath);
                 if (projectOpt.isEmpty()) {
-                    if (projectName.isPresent()) {
-                        return errorResult("Error: Project not found: " + projectName.get());
-                    } else {
-                        return errorResult("Error: No open projects found");
-                    }
+                    return errorResult("Error: Project not found at path: " + projectPath);
                 }
                 Project project = projectOpt.get();
 

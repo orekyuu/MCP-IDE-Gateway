@@ -33,7 +33,7 @@ public class OpenFileTool extends AbstractMcpTool<OpenFileTool.OpenFileResponse>
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
                 .requiredString("filePath", "Absolute path to the file to open")
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
 
@@ -42,24 +42,19 @@ public class OpenFileTool extends AbstractMcpTool<OpenFileTool.OpenFileResponse>
         try {
             // Get required file path
             String filePath;
+            String projectPath;
             try {
                 filePath = getRequiredStringArg(arguments, "filePath");
+                projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
-                return errorResult("Error: filePath is required");
+                return errorResult("Error: " + e.getMessage());
             }
 
-            // Get optional project name
-            Optional<String> projectName = getStringArg(arguments, "projectName");
-
             // Find target project
-            Optional<Project> targetProject = findProjectOrFirst(projectName.orElse(null));
+            Optional<Project> targetProject = findProjectByPath(projectPath);
 
             if (targetProject.isEmpty()) {
-                if (projectName.isPresent()) {
-                    return errorResult("Error: Project not found: " + projectName.get());
-                } else {
-                    return errorResult("Error: No open projects found");
-                }
+                return errorResult("Error: Project not found at path: " + projectPath);
             }
 
             // Find the file

@@ -39,7 +39,7 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
     @Override
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
-                .optionalString("projectName", "Name of the project (optional, uses first project if not specified)")
+                .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalBoolean("errorsOnly", "Whether to return only errors, excluding warnings (default: false)")
                 .build();
     }
@@ -48,17 +48,18 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
     public Result<ErrorResponse, GetDiagnosticsResponse> execute(Map<String, Object> arguments) {
         return runReadActionWithResult(() -> {
             try {
-                Optional<String> projectName = getStringArg(arguments, "projectName");
+                String projectPath;
+                try {
+                    projectPath = getRequiredStringArg(arguments, "projectPath");
+                } catch (IllegalArgumentException e) {
+                    return errorResult("Error: projectPath is required");
+                }
                 boolean errorsOnly = getBooleanArg(arguments, "errorsOnly").orElse(false);
 
                 // Find project
-                Optional<Project> projectOpt = findProjectOrFirst(projectName.orElse(null));
+                Optional<Project> projectOpt = findProjectByPath(projectPath);
                 if (projectOpt.isEmpty()) {
-                    if (projectName.isPresent()) {
-                        return errorResult("Error: Project not found: " + projectName.get());
-                    } else {
-                        return errorResult("Error: No open projects found");
-                    }
+                    return errorResult("Error: Project not found at path: " + projectPath);
                 }
                 Project project = projectOpt.get();
 

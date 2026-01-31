@@ -35,21 +35,31 @@ public class GetTypeHierarchyToolTest extends BasePlatformTestCase {
         assertThat(schema.properties())
                 .isNotNull()
                 .containsKey("className")
-                .containsKey("projectName")
+                .containsKey("projectPath")
                 .containsKey("includeSubclasses");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("className");
+                .contains("className", "projectPath");
     }
 
     public void testExecuteWithMissingClassName() {
-        var result = tool.execute(Map.of());
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetTypeHierarchyTool.TypeHierarchyResponse>) result;
         assertThat(errorResult.message().message()).contains("className");
+    }
+
+    public void testExecuteWithMissingProjectPath() {
+        var result = tool.execute(Map.of("className", "SomeClass"));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetTypeHierarchyTool.TypeHierarchyResponse>) result;
+        assertThat(errorResult.message().message()).contains("projectPath");
     }
 
     public void testToSpecification() {
