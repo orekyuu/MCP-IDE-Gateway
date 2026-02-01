@@ -52,7 +52,8 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
 
         ListProjectsTool.ListProjectsResponse.ProjectInfo project = response.projects().get(0);
         assertThat(project.name()).isNotNull();
-        assertThat(project.locationHash()).isNotNull();
+        assertThat(project.basePath()).isNotNull();
+        // gitRemote and gitBranch may be null in test environment (not a git repo)
     }
 
     public void testToSpecification() {

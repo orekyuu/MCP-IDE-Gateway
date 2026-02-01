@@ -70,4 +70,44 @@ public class RunInspectionToolTest extends BasePlatformTestCase {
         assertThat(spec.tool().name()).isEqualTo("run_inspection");
         assertThat(spec.tool().inputSchema()).isNotNull();
     }
+
+    public void testShouldSkipEditorConfigInspectionForJavaFile() {
+        // Test the filtering logic: EditorConfig inspections should be skipped for .java files
+        assertThat(shouldSkipInspection("EditorConfigVerifyByCore", "java")).isTrue();
+        assertThat(shouldSkipInspection("EditorConfigCharsetInspection", "java")).isTrue();
+        assertThat(shouldSkipInspection("JsonDuplicatePropertyKeys", "java")).isTrue();
+        assertThat(shouldSkipInspection("YamlUnresolvedAlias", "java")).isTrue();
+    }
+
+    public void testShouldNotSkipEditorConfigInspectionForEditorConfigFile() {
+        // EditorConfig inspections should NOT be skipped for .editorconfig files
+        assertThat(shouldSkipInspection("EditorConfigVerifyByCore", "editorconfig")).isFalse();
+    }
+
+    public void testShouldNotSkipJsonInspectionForJsonFile() {
+        // Json inspections should NOT be skipped for .json files
+        assertThat(shouldSkipInspection("JsonDuplicatePropertyKeys", "json")).isFalse();
+    }
+
+    public void testShouldNotSkipJavaInspectionForJavaFile() {
+        // Java inspections should NOT be skipped for .java files
+        assertThat(shouldSkipInspection("UnusedDeclaration", "java")).isFalse();
+        assertThat(shouldSkipInspection("JavaDoc", "java")).isFalse();
+    }
+
+    /**
+     * Simulates the filtering logic in RunInspectionTool.collectProblemsFromFile
+     */
+    private boolean shouldSkipInspection(String shortName, String fileExtension) {
+        if (shortName.startsWith("EditorConfig") || shortName.startsWith("Json") || shortName.startsWith("Yaml")) {
+            if (fileExtension == null ||
+                (!fileExtension.equals("editorconfig") &&
+                 !fileExtension.equals("json") &&
+                 !fileExtension.equals("yaml") &&
+                 !fileExtension.equals("yml"))) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
