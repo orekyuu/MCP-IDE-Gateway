@@ -38,6 +38,7 @@ public class McpToolRegistry {
         registry.register(new RenameSymbolTool());
         registry.register(new ExtractMethodTool());
         registry.register(new RunInspectionTool());
+        registry.register(new SearchTextTool());
         return registry;
     }
 
