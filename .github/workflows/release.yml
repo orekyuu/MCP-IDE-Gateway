@@ -1,0 +1,79 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v-[0-9]{8}'  # v-yyyyMMdd 形式のタグ（任意の8桁数字）
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
+      - name: Verify Plugin
+        run: ./gradlew verifyPlugin
+
+      - name: Get Plugin Info
+        id: plugin_info
+        run: |
+          echo "version=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
+          echo "name=$(./gradlew properties --no-daemon --console=plain -q | grep "^pluginName:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
+          echo "build_dir=$(./gradlew properties --no-daemon --console=plain -q | grep "^buildDir:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
+
+      - name: Extract Tag Date
+        id: tag_date
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          DATE_PART=${TAG_NAME#v-}
+          FORMATTED_DATE=$(date -d "$DATE_PART" +"%Y年%m月%d日" 2>/dev/null || echo "$DATE_PART")
+          echo "date=$FORMATTED_DATE" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag_date.outputs.tag_name }}
+          release_name: "Release ${{ steps.tag_date.outputs.tag_name }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload Plugin ZIP
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.plugin_info.outputs.build_dir }}/distributions/${{ steps.plugin_info.outputs.name }}-${{ steps.plugin_info.outputs.version }}.zip
+          asset_name: ${{ steps.plugin_info.outputs.name }}-${{ steps.plugin_info.outputs.version }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload Build Reports (Optional)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports-${{ steps.tag_date.outputs.tag_name }}
+          path: |
+            build/reports/
+            build/test-results/
+          retention-days: 7
