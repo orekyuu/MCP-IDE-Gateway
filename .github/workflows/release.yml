@@ -3,7 +3,7 @@ name: Release Plugin
 on:
   push:
     tags:
-      - 'v-[0-9]{8}'  # v-yyyyMMdd 形式のタグ（任意の8桁数字）
+      - 'v-*'  # v-yyyyMMdd 形式のタグ
 
 jobs:
   release:
