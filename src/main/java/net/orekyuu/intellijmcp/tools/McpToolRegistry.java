@@ -39,6 +39,7 @@ public class McpToolRegistry {
         registry.register(new ExtractMethodTool());
         registry.register(new RunInspectionTool());
         registry.register(new SearchTextTool());
+        registry.register(new FindFileTool());
         return registry;
     }
 
