@@ -250,7 +250,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 String severityStr = getSeverityStringFromLevel(level);
                 if (getSeverityLevel(severityStr) < minSeverityLevel) continue;
 
-                toolSeverityMap.put(wrapper.getShortName(), severityStr);
+                toolSeverityMap.put(wrapper.getID(), severityStr);
 
                 if (wrapper instanceof LocalInspectionToolWrapper localWrapper) {
                     localTools.add(localWrapper);
@@ -263,7 +263,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                         LocalInspectionToolWrapper sharedLocalTool = globalWrapper.getSharedLocalInspectionToolWrapper();
                         if (sharedLocalTool != null) {
                             localTools.add(sharedLocalTool);
-                            toolSeverityMap.put(sharedLocalTool.getShortName(), severityStr);
+                            toolSeverityMap.put(sharedLocalTool.getID(), severityStr);
                         }
                     }
                 }
@@ -317,7 +317,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 }
 
                 LocalInspectionToolWrapper toolWrapper = entry.getKey();
-                String severity = toolSeverityMap.get(toolWrapper.getShortName());
+                String severity = toolSeverityMap.get(toolWrapper.getID());
                 if (severity == null) continue;
 
                 for (ProblemDescriptor descriptor : entry.getValue()) {
@@ -354,7 +354,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
             try {
                 GlobalInspectionTool tool = toolWrapper.getTool();
-                String severity = toolSeverityMap.get(toolWrapper.getShortName());
+                String severity = toolSeverityMap.get(toolWrapper.getID());
                 if (severity == null) continue;
 
                 // Run checkFile in read action
@@ -391,12 +391,8 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
     private boolean matchesInspectionNames(InspectionToolWrapper<?, ?> toolWrapper, List<String> inspectionNames) {
         if (inspectionNames == null || inspectionNames.isEmpty()) return true;
-        String shortName = toolWrapper.getShortName().toLowerCase();
-        String displayName = toolWrapper.getDisplayName().toLowerCase();
-        return inspectionNames.stream().anyMatch(name -> {
-            String lowerName = name.toLowerCase();
-            return shortName.contains(lowerName) || displayName.contains(lowerName);
-        });
+        String id = toolWrapper.getID();
+        return inspectionNames.stream().anyMatch(name -> id.equals(name));
     }
 
     private InspectionProblem createProblem(PsiFile psiFile, ProblemDescriptor descriptor,
@@ -408,7 +404,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
         String filePath = psiFile.getVirtualFile() != null ? psiFile.getVirtualFile().getPath() : null;
         String message = descriptor.getDescriptionTemplate();
-        String inspectionId = toolWrapper.getShortName();
+        String inspectionId = toolWrapper.getID();
 
         LineRange lineRange = getLineRange(element);
 
