@@ -4,6 +4,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.Map;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -115,7 +116,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
                 }
                 """);
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
         var result = tool.execute(Map.of(
                 "searchText", "searchableText",
                 "projectPath", projectPath
@@ -142,7 +143,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
                 }
                 """);
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
 
         // Case-sensitive search for "TEST" should find only uppercase
         var result = tool.execute(Map.of(
@@ -170,7 +171,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
                 }
                 """);
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
 
         // Regex search for "value\\d"
         var result = tool.execute(Map.of(
@@ -194,7 +195,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
         myFixture.configureByText("SearchMe.java", "// target text in java");
         myFixture.configureByText("IgnoreMe.txt", "target text in txt");
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
 
         // Search only in .java files
         var result = tool.execute(Map.of(
@@ -221,7 +222,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
 
         myFixture.configureByText("ManyMatches.java", content.toString());
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
 
         var result = tool.execute(Map.of(
                 "searchText", "findme",
@@ -245,7 +246,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
                 line3
                 """);
 
-        String projectPath = getProject().getBasePath();
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
 
         var result = tool.execute(Map.of(
                 "searchText", "target",
@@ -257,7 +258,7 @@ public class SearchTextToolTest extends BasePlatformTestCase {
         var response = successResult.message();
 
         assertThat(response.matches()).hasSize(1);
-        var match = response.matches().get(0);
+        var match = response.matches().getFirst();
 
         assertThat(match.line()).isEqualTo(2);
         assertThat(match.column()).isGreaterThan(0);

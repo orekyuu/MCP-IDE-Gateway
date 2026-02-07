@@ -61,7 +61,7 @@ class McpToolRegistryTest {
     void registerCustomTool() {
         McpToolRegistry registry = new McpToolRegistry();
 
-        McpTool<String> customTool = new AbstractMcpTool<String>() {
+        McpTool<String> customTool = new AbstractMcpTool<>() {
             @Override
             public String getName() {
                 return "custom_tool";
@@ -88,6 +88,6 @@ class McpToolRegistryTest {
         registry.register(customTool);
 
         assertThat(registry.size()).isEqualTo(1);
-        assertThat(registry.getTools().get(0).getName()).isEqualTo("custom_tool");
+        assertThat(registry.getTools().getFirst().getName()).isEqualTo("custom_tool");
     }
 }

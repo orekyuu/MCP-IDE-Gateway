@@ -160,9 +160,7 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
                 // Check if it's a renameable element
                 if (current instanceof PsiClass ||
                     current instanceof PsiMethod ||
-                    current instanceof PsiField ||
-                    current instanceof PsiVariable ||
-                    current instanceof PsiParameter) {
+                    current instanceof PsiVariable) {
                     return current;
                 }
             }

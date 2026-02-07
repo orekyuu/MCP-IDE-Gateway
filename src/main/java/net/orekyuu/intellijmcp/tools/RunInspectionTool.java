@@ -1,7 +1,9 @@
 package net.orekyuu.intellijmcp.tools;
 
 import com.intellij.analysis.AnalysisScope;
+import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInspection.*;
+import org.jetbrains.annotations.NotNull;
 import com.intellij.codeInspection.ex.*;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -156,7 +158,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     ? new ArrayList<>(problems.subList(0, maxProblems))
                     : new ArrayList<>(problems);
 
-            // Group by severity
+            // Count by severity
             int errors = 0, warnings = 0, weakWarnings = 0, infos = 0;
             for (InspectionProblem p : resultProblems) {
                 switch (p.severity()) {
@@ -167,6 +169,44 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 }
             }
 
+            // Group by file and sort by severity
+            Map<String, List<InspectionProblem>> problemsByFile = new LinkedHashMap<>();
+            for (InspectionProblem p : resultProblems) {
+                problemsByFile.computeIfAbsent(p.filePath(), k -> new ArrayList<>()).add(p);
+            }
+
+            // Sort problems within each file by severity (ERROR first, then WARNING, etc.)
+            String projectPathPrefix = projectPath.endsWith("/") ? projectPath : projectPath + "/";
+            List<FileProblems> groupedProblems = new ArrayList<>();
+            for (Map.Entry<String, List<InspectionProblem>> entry : problemsByFile.entrySet()) {
+                List<InspectionProblem> fileProblems = entry.getValue();
+                fileProblems.sort(Comparator.comparingInt((InspectionProblem p) -> -getSeverityLevel(p.severity())));
+
+                List<Problem> compactProblems = fileProblems.stream()
+                        .map(p -> new Problem(
+                                p.message(),
+                                p.severity(),
+                                p.inspectionId(),
+                                p.lineRange() != null ? p.lineRange().startLine() : 0
+                        ))
+                        .toList();
+
+                // Convert to relative path
+                String relativePath = entry.getKey();
+                if (relativePath != null && relativePath.startsWith(projectPathPrefix)) {
+                    relativePath = relativePath.substring(projectPathPrefix.length());
+                }
+
+                groupedProblems.add(new FileProblems(relativePath, compactProblems));
+            }
+
+            // Sort files: files with errors first, then by file path
+            groupedProblems.sort(Comparator
+                    .comparingInt((FileProblems f) -> -f.problems().stream()
+                            .mapToInt(p -> getSeverityLevel(p.severity()))
+                            .max().orElse(0))
+                    .thenComparing(FileProblems::filePath));
+
             return successResult(new InspectionResponse(
                     resultProblems.size(),
                     errors,
@@ -174,7 +214,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     weakWarnings,
                     infos,
                     timedOut[0],
-                    resultProblems
+                    groupedProblems
             ));
 
         } catch (Exception e) {
@@ -194,11 +234,23 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         // Collect tool wrappers in a read action
         List<LocalInspectionToolWrapper> localTools = new ArrayList<>();
         List<GlobalInspectionToolWrapper> globalSimpleTools = new ArrayList<>();
+        Map<String, String> toolSeverityMap = new HashMap<>();
 
         ReadAction.run(() -> {
             for (InspectionToolWrapper<?, ?> wrapper : profile.getInspectionTools(psiFile)) {
                 if (!profile.isToolEnabled(wrapper.getDisplayKey(), psiFile)) continue;
                 if (!matchesInspectionNames(wrapper, inspectionNames)) continue;
+
+                var displayKey = wrapper.getDisplayKey();
+                if (displayKey == null) continue;
+
+                HighlightDisplayLevel level = profile.getErrorLevel(displayKey, psiFile);
+                if (level == HighlightDisplayLevel.DO_NOT_SHOW) continue;
+
+                String severityStr = getSeverityStringFromLevel(level);
+                if (getSeverityLevel(severityStr) < minSeverityLevel) continue;
+
+                toolSeverityMap.put(wrapper.getShortName(), severityStr);
 
                 if (wrapper instanceof LocalInspectionToolWrapper localWrapper) {
                     localTools.add(localWrapper);
@@ -219,18 +271,18 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
         // Run local inspections (uses read action internally)
         if (!localTools.isEmpty() && !timedOut[0]) {
-            runLocalInspections(localTools, psiFile, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
+            runLocalInspections(localTools, psiFile, toolSeverityMap, maxProblems, problems, startTime, timeoutMillis, timedOut);
         }
 
         // Run global simple inspections
         if (!globalSimpleTools.isEmpty() && !timedOut[0]) {
-            runGlobalSimpleInspections(project, globalSimpleTools, psiFile, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
+            runGlobalSimpleInspections(project, globalSimpleTools, psiFile, toolSeverityMap, maxProblems, problems, startTime, timeoutMillis, timedOut);
         }
     }
 
     private void runLocalInspections(List<LocalInspectionToolWrapper> toolWrappers,
                                      PsiFile psiFile,
-                                     int minSeverityLevel, int maxProblems,
+                                     Map<String, String> toolSeverityMap, int maxProblems,
                                      List<InspectionProblem> problems,
                                      long startTime, long timeoutMillis, boolean[] timedOut) {
         try {
@@ -258,14 +310,14 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 }
 
                 LocalInspectionToolWrapper toolWrapper = entry.getKey();
+                String severity = toolSeverityMap.get(toolWrapper.getShortName());
+                if (severity == null) continue;
+
                 for (ProblemDescriptor descriptor : entry.getValue()) {
                     if (problems.size() >= maxProblems) break;
 
-                    String severity = getSeverityString(descriptor.getHighlightType());
-                    if (getSeverityLevel(severity) < minSeverityLevel) continue;
-
                     // Create problem in read action (needs PSI access)
-                    InspectionProblem problem = ReadAction.compute(() -> createProblem(psiFile, descriptor, toolWrapper));
+                    InspectionProblem problem = ReadAction.compute(() -> createProblem(psiFile, descriptor, toolWrapper, severity));
                     if (problem != null) {
                         problems.add(problem);
                     }
@@ -279,7 +331,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     private void runGlobalSimpleInspections(Project project,
                                             List<GlobalInspectionToolWrapper> toolWrappers,
                                             PsiFile psiFile,
-                                            int minSeverityLevel, int maxProblems,
+                                            Map<String, String> toolSeverityMap, int maxProblems,
                                             List<InspectionProblem> problems,
                                             long startTime, long timeoutMillis, boolean[] timedOut) {
         InspectionManager inspectionManager = InspectionManager.getInstance(project);
@@ -295,6 +347,8 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
             try {
                 GlobalInspectionTool tool = toolWrapper.getTool();
+                String severity = toolSeverityMap.get(toolWrapper.getShortName());
+                if (severity == null) continue;
 
                 // Run checkFile in read action
                 List<ProblemDescriptor> descriptors = ReadAction.compute(() -> {
@@ -308,10 +362,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 for (ProblemDescriptor descriptor : descriptors) {
                     if (problems.size() >= maxProblems) break;
 
-                    String severity = getSeverityString(descriptor.getHighlightType());
-                    if (getSeverityLevel(severity) < minSeverityLevel) continue;
-
-                    InspectionProblem problem = ReadAction.compute(() -> createProblem(psiFile, descriptor, toolWrapper));
+                    InspectionProblem problem = ReadAction.compute(() -> createProblem(psiFile, descriptor, toolWrapper, severity));
                     if (problem != null) {
                         problems.add(problem);
                     }
@@ -325,7 +376,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     private GlobalInspectionContextBase createSimpleGlobalContext(Project project) {
         return new GlobalInspectionContextBase(project) {
             @Override
-            protected void runTools(AnalysisScope scope, boolean runGlobalToolsOnly, boolean isOfflineInspections) {
+            protected void runTools(@NotNull AnalysisScope scope, boolean runGlobalToolsOnly, boolean isOfflineInspections) {
                 // No-op - we run tools manually
             }
         };
@@ -342,7 +393,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     }
 
     private InspectionProblem createProblem(PsiFile psiFile, ProblemDescriptor descriptor,
-                                            InspectionToolWrapper<?, ?> toolWrapper) {
+                                            InspectionToolWrapper<?, ?> toolWrapper, String severity) {
         PsiElement element = descriptor.getPsiElement();
         if (element == null) {
             return null;
@@ -350,40 +401,24 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
         String filePath = psiFile.getVirtualFile() != null ? psiFile.getVirtualFile().getPath() : null;
         String message = descriptor.getDescriptionTemplate();
-        String severity = getSeverityString(descriptor.getHighlightType());
         String inspectionId = toolWrapper.getShortName();
-        String inspectionDisplayName = toolWrapper.getDisplayName();
 
         LineRange lineRange = getLineRange(element);
-
-        List<String> quickFixes = new ArrayList<>();
-        QuickFix<?>[] fixes = descriptor.getFixes();
-        if (fixes != null) {
-            for (QuickFix<?> fix : fixes) {
-                quickFixes.add(fix.getName());
-            }
-        }
 
         return new InspectionProblem(
                 filePath,
                 message,
                 severity,
                 inspectionId,
-                inspectionDisplayName,
-                lineRange,
-                quickFixes
+                lineRange
         );
     }
 
-    private String getSeverityString(ProblemHighlightType highlightType) {
-        return switch (highlightType) {
-            case ERROR, GENERIC_ERROR -> "ERROR";
-            case WARNING, GENERIC_ERROR_OR_WARNING -> "WARNING";
-            case WEAK_WARNING -> "WEAK_WARNING";
-            case INFORMATION, LIKE_UNUSED_SYMBOL, LIKE_DEPRECATED, LIKE_MARKED_FOR_REMOVAL, LIKE_UNKNOWN_SYMBOL ->
-                    "INFO";
-            default -> "INFO";
-        };
+    private String getSeverityStringFromLevel(HighlightDisplayLevel level) {
+        if (level == HighlightDisplayLevel.ERROR || level == HighlightDisplayLevel.NON_SWITCHABLE_ERROR) return "ERROR";
+        if (level == HighlightDisplayLevel.WARNING || level == HighlightDisplayLevel.NON_SWITCHABLE_WARNING) return "WARNING";
+        if (level == HighlightDisplayLevel.WEAK_WARNING) return "WEAK_WARNING";
+        return "INFO";
     }
 
     private int getSeverityLevel(String severity) {
@@ -427,16 +462,27 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             int weakWarnings,
             int infos,
             boolean timedOut,
-            List<InspectionProblem> problems
+            List<FileProblems> files
     ) {}
 
-    public record InspectionProblem(
+    public record FileProblems(
+            String filePath,
+            List<Problem> problems
+    ) {}
+
+    public record Problem(
+            String message,
+            String severity,
+            String inspectionId,
+            int line
+    ) {}
+
+    // Internal record for collecting problems before grouping
+    private record InspectionProblem(
             String filePath,
             String message,
             String severity,
             String inspectionId,
-            String inspectionName,
-            LineRange lineRange,
-            List<String> quickFixes
+            LineRange lineRange
     ) {}
 }

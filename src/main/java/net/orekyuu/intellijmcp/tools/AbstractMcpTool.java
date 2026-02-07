@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Computable;
-import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.List;
 import java.util.Map;

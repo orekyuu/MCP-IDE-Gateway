@@ -84,10 +84,7 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
                     if (!includeAbstract && inheritor.hasModifierProperty(PsiModifier.ABSTRACT)) {
                         continue;
                     }
-                    ClassInfo info = createClassInfo(inheritor);
-                    if (info != null) {
-                        result.add(info);
-                    }
+                    result.add(createClassInfo(inheritor));
                 }
                 return result;
             });

@@ -37,7 +37,7 @@ public interface McpTool<RESPONSE> {
      */
     Result<ErrorResponse, RESPONSE> execute(Map<String, Object> arguments);
 
-    public sealed interface Result<L, R> {
+    sealed interface Result<L, R> {
       record ErrorResponse<L, R>(L message) implements Result<L, R> {}
       record SuccessResponse<L, R>(R message) implements Result<L, R> {}
 
@@ -61,9 +61,10 @@ public interface McpTool<RESPONSE> {
                 .inputSchema(getInputSchema())
                 .build();
 
-        return new McpServerFeatures.SyncToolSpecification(
-                tool,
-                (exchange, arguments) -> {
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    Map<String, Object> arguments = request.arguments();
                     McpServerLogService logService = McpServerLogService.getInstance();
                     String toolName = getName();
 
@@ -77,21 +78,21 @@ public interface McpTool<RESPONSE> {
                     return switch (result) {
                         case Result.ErrorResponse<ErrorResponse, RESPONSE> err -> {
                             logService.error("  Response (error): " + err.message().message());
-                            yield new McpSchema.CallToolResult(
-                                    List.of(new McpSchema.TextContent(err.message().message())),
-                                    true
-                            );
+                            yield McpSchema.CallToolResult.builder()
+                                    .content(List.of(new McpSchema.TextContent(err.message().message())))
+                                    .isError(true)
+                                    .build();
                         }
                         case Result.SuccessResponse<ErrorResponse, RESPONSE> success -> {
                             String responseBody = ResponseSerializer.serialize(success.message());
                             logService.info("  Response: " + responseBody);
-                            yield new McpSchema.CallToolResult(
-                                    List.of(new McpSchema.TextContent(responseBody)),
-                                    false
-                            );
+                            yield McpSchema.CallToolResult.builder()
+                                    .content(List.of(new McpSchema.TextContent(responseBody)))
+                                    .isError(false)
+                                    .build();
                         }
                     };
-                }
-        );
+                })
+                .build();
     }
 }

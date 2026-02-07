@@ -177,7 +177,8 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
         String name = field.getName();
         String type = field.getType().getPresentableText();
         List<String> modifiers = getModifiers(field.getModifierList());
-        boolean inherited = !field.getContainingClass().equals(containingClass);
+        PsiClass fieldClass = field.getContainingClass();
+        boolean inherited = fieldClass != null && !fieldClass.equals(containingClass);
         LineRange lineRange = getLineRange(field);
 
         return new FieldInfo(name, type, modifiers, inherited, lineRange);
@@ -188,7 +189,8 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
         String returnType = method.isConstructor() ? null :
                 method.getReturnType() != null ? method.getReturnType().getPresentableText() : "void";
         List<String> modifiers = getModifiers(method.getModifierList());
-        boolean inherited = !method.getContainingClass().equals(containingClass);
+        PsiClass methodClass = method.getContainingClass();
+        boolean inherited = methodClass != null && !methodClass.equals(containingClass);
         LineRange lineRange = getLineRange(method);
 
         // Get parameters

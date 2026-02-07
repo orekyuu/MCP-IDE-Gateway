@@ -100,13 +100,11 @@ public class RunInspectionToolTest extends BasePlatformTestCase {
      */
     private boolean shouldSkipInspection(String shortName, String fileExtension) {
         if (shortName.startsWith("EditorConfig") || shortName.startsWith("Json") || shortName.startsWith("Yaml")) {
-            if (fileExtension == null ||
-                (!fileExtension.equals("editorconfig") &&
-                 !fileExtension.equals("json") &&
-                 !fileExtension.equals("yaml") &&
-                 !fileExtension.equals("yml"))) {
-                return true;
-            }
+            return fileExtension == null ||
+                   (!fileExtension.equals("editorconfig") &&
+                    !fileExtension.equals("json") &&
+                    !fileExtension.equals("yaml") &&
+                    !fileExtension.equals("yml"));
         }
         return false;
     }

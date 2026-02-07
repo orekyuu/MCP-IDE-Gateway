@@ -76,19 +76,13 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
                     // Search by fully qualified name
                     PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
                     for (PsiClass psiClass : classes) {
-                        ClassInfo info = createClassInfo(psiClass);
-                        if (info != null) {
-                            foundClasses.add(info);
-                        }
+                        foundClasses.add(createClassInfo(psiClass));
                     }
                 } else {
                     // Search by simple name
                     PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
                     for (PsiClass psiClass : classes) {
-                        ClassInfo info = createClassInfo(psiClass);
-                        if (info != null) {
-                            foundClasses.add(info);
-                        }
+                        foundClasses.add(createClassInfo(psiClass));
                     }
                 }
 

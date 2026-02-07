@@ -23,7 +23,6 @@ public class ServerLogPanel implements Disposable {
 
     private final JPanel mainPanel;
     private final ConsoleView consoleView;
-    private final MessageBusConnection connection;
 
     public ServerLogPanel() {
         mainPanel = new JPanel(new BorderLayout());
@@ -50,7 +49,7 @@ public class ServerLogPanel implements Disposable {
         mainPanel.add(consoleView.getComponent(), BorderLayout.CENTER);
 
         // Subscribe to log events
-        connection = ApplicationManager.getApplication().getMessageBus()
+        MessageBusConnection connection = ApplicationManager.getApplication().getMessageBus()
                 .connect(this);
         connection.subscribe(McpServerLogService.LOG_TOPIC, new McpServerLogService.LogListener() {
             @Override
@@ -98,7 +97,7 @@ public class ServerLogPanel implements Disposable {
         // Connection is disposed automatically since we passed 'this' as parent
     }
 
-    private class StartServerAction extends AnAction {
+    private static class StartServerAction extends AnAction {
         StartServerAction() {
             super("Start Server", "Start MCP server", com.intellij.icons.AllIcons.Actions.Execute);
         }
@@ -119,7 +118,7 @@ public class ServerLogPanel implements Disposable {
         }
     }
 
-    private class StopServerAction extends AnAction {
+    private static class StopServerAction extends AnAction {
         StopServerAction() {
             super("Stop Server", "Stop MCP server", com.intellij.icons.AllIcons.Actions.Suspend);
         }
@@ -140,7 +139,7 @@ public class ServerLogPanel implements Disposable {
         }
     }
 
-    private class RestartServerAction extends AnAction {
+    private static class RestartServerAction extends AnAction {
         RestartServerAction() {
             super("Restart Server", "Restart MCP server", com.intellij.icons.AllIcons.Actions.Restart);
         }
@@ -163,7 +162,7 @@ public class ServerLogPanel implements Disposable {
         }
     }
 
-    private class ClearLogAction extends AnAction {
+    private static class ClearLogAction extends AnAction {
         ClearLogAction() {
             super("Clear Log", "Clear all log entries", com.intellij.icons.AllIcons.Actions.GC);
         }

@@ -147,9 +147,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
                 Set<PsiMethod> methods = new LinkedHashSet<>();
                 methods.add(method);
                 // Add super methods (interface methods that this method implements)
-                for (PsiMethod superMethod : method.findSuperMethods()) {
-                    methods.add(superMethod);
-                }
+                Collections.addAll(methods, method.findSuperMethods());
                 return methods;
             });
 
@@ -169,7 +167,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
                     PsiElement refElement = ref.getElement();
                     PsiMethod callerMethod = PsiTreeUtil.getParentOfType(refElement, PsiMethod.class, false);
 
-                    if (callerMethod != null && !callerMethod.equals(method) && !methods.contains(callerMethod)) {
+                    if (callerMethod != null && !callerMethod.equals(method)) {
                         methods.add(callerMethod);
                     }
                 }

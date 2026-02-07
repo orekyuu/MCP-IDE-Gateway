@@ -150,14 +150,11 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
                 if (file.isDirectory()) {
                     // Skip hidden directories and common non-source directories
                     String name = file.getName();
-                    if (name.startsWith(".") ||
-                        name.equals("node_modules") ||
-                        name.equals("build") ||
-                        name.equals("out") ||
-                        name.equals("target")) {
-                        return false;
-                    }
-                    return true;
+                    return !name.startsWith(".") &&
+                           !name.equals("node_modules") &&
+                           !name.equals("build") &&
+                           !name.equals("out") &&
+                           !name.equals("target");
                 }
 
                 // Skip binary files

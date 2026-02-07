@@ -1,6 +1,5 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -50,7 +49,7 @@ public class ListProjectsToolTest extends BasePlatformTestCase {
         assertThat(response.projects()).isNotNull();
         assertThat(response.projects().size()).isGreaterThanOrEqualTo(1);
 
-        ListProjectsTool.ListProjectsResponse.ProjectInfo project = response.projects().get(0);
+        ListProjectsTool.ListProjectsResponse.ProjectInfo project = response.projects().getFirst();
         assertThat(project.name()).isNotNull();
         assertThat(project.basePath()).isNotNull();
         // gitRemote and gitBranch may be null in test environment (not a git repo)

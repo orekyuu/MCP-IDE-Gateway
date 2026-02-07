@@ -148,10 +148,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
         // Try methods first
         for (PsiMethod method : psiClass.getMethods()) {
             if (method.getName().equals(baseName)) {
-                Documentation doc = extractMethodDocumentation(method);
-                if (doc != null) {
-                    return doc;
-                }
+                return extractMethodDocumentation(method);
             }
         }
 
@@ -263,11 +260,11 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
         for (PsiElement element : docComment.getDescriptionElements()) {
             String text = element.getText().trim();
             if (!text.isEmpty()) {
-                if (sb.length() > 0) sb.append(" ");
+                if (!sb.isEmpty()) sb.append(" ");
                 sb.append(text);
             }
         }
-        return sb.length() > 0 ? sb.toString() : null;
+        return !sb.isEmpty() ? sb.toString() : null;
     }
 
     private List<DocTag> extractTags(PsiDocComment docComment) {

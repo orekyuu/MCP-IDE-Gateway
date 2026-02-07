@@ -5,17 +5,16 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileVisitor;
-import com.intellij.problems.Problem;
 import com.intellij.problems.WolfTheProblemSolver;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import io.modelcontextprotocol.spec.McpSchema;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -79,7 +78,7 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
                 for (VirtualFile root : contentRoots) {
                     VfsUtilCore.visitChildrenRecursively(root, new VirtualFileVisitor<Void>() {
                         @Override
-                        public boolean visitFile(VirtualFile file) {
+                        public boolean visitFile(@NotNull VirtualFile file) {
                             if (!file.isDirectory() && isSourceFile(file) && !processedFiles.contains(file)) {
                                 processedFiles.add(file);
 
@@ -129,6 +128,7 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
         );
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     private FileDiagnostics getFileDiagnostics(Project project, VirtualFile file, boolean errorsOnly) {
         PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
         if (psiFile == null) {
