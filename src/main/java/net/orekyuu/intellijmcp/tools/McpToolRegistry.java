@@ -40,6 +40,7 @@ public class McpToolRegistry {
         registry.register(new RunInspectionTool());
         registry.register(new SearchTextTool());
         registry.register(new FindFileTool());
+        registry.register(new GetSourceCodeTool());
         return registry;
     }
 
