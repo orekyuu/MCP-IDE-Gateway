@@ -258,6 +258,13 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     GlobalInspectionTool tool = globalWrapper.getTool();
                     if (tool.isGlobalSimpleInspectionTool()) {
                         globalSimpleTools.add(globalWrapper);
+                    } else {
+                        // Non-simple global tools may have a shared local inspection tool
+                        LocalInspectionToolWrapper sharedLocalTool = globalWrapper.getSharedLocalInspectionToolWrapper();
+                        if (sharedLocalTool != null) {
+                            localTools.add(sharedLocalTool);
+                            toolSeverityMap.put(sharedLocalTool.getShortName(), severityStr);
+                        }
                     }
                 }
             }
