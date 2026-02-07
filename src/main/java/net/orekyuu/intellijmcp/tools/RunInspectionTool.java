@@ -391,8 +391,23 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
     private boolean matchesInspectionNames(InspectionToolWrapper<?, ?> toolWrapper, List<String> inspectionNames) {
         if (inspectionNames == null || inspectionNames.isEmpty()) return true;
-        String id = toolWrapper.getID();
-        return inspectionNames.stream().anyMatch(name -> id.equals(name));
+        String shortName = toolWrapper.getShortName();
+        String alternativeId = toolWrapper.getTool().getAlternativeID();
+        boolean matched = inspectionNames.stream().anyMatch(name ->
+                shortName.equals(name) || (alternativeId != null && alternativeId.equals(name)));
+        if (matched) return true;
+
+        // For global tools, also check the shared local tool's alternative ID
+        if (toolWrapper instanceof GlobalInspectionToolWrapper globalWrapper) {
+            LocalInspectionToolWrapper sharedLocal = globalWrapper.getSharedLocalInspectionToolWrapper();
+            if (sharedLocal != null) {
+                String sharedAlternativeId = sharedLocal.getTool().getAlternativeID();
+                if (sharedAlternativeId != null) {
+                    return inspectionNames.stream().anyMatch(name -> sharedAlternativeId.equals(name));
+                }
+            }
+        }
+        return false;
     }
 
     private InspectionProblem createProblem(PsiFile psiFile, ProblemDescriptor descriptor,
@@ -404,7 +419,8 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
         String filePath = psiFile.getVirtualFile() != null ? psiFile.getVirtualFile().getPath() : null;
         String message = descriptor.getDescriptionTemplate();
-        String inspectionId = toolWrapper.getID();
+        String alternativeId = toolWrapper.getTool().getAlternativeID();
+        String inspectionId = alternativeId != null ? alternativeId : toolWrapper.getShortName();
 
         LineRange lineRange = getLineRange(element);
 
