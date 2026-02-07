@@ -163,4 +163,23 @@ public abstract class AbstractMcpTool<RESPONSE> implements McpTool<RESPONSE> {
         }
         return Optional.empty();
     }
+
+    /**
+     * Gets a string list argument from the arguments map.
+     *
+     * @param arguments the arguments map
+     * @param key       the key to look up
+     * @return List containing string values (empty list if not present)
+     */
+    @SuppressWarnings("unchecked")
+    protected List<String> getStringListArg(Map<String, Object> arguments, String key) {
+        Object value = arguments.get(key);
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .filter(item -> item instanceof String)
+                    .map(item -> (String) item)
+                    .toList();
+        }
+        return List.of();
+    }
 }

@@ -129,6 +129,28 @@ class JsonSchemaBuilderTest {
     }
 
     @Test
+    void buildSchemaWithOptionalStringArray() {
+        McpSchema.JsonSchema schema = JsonSchemaBuilder.object()
+                .optionalStringArray("names", "List of names")
+                .build();
+
+        assertThat(schema.type()).isEqualTo("object");
+        assertThat(schema.properties()).hasSize(1);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> prop = (Map<String, Object>) schema.properties().get("names");
+        assertThat(prop)
+                .containsEntry("type", "array")
+                .containsEntry("description", "List of names");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> items = (Map<String, Object>) prop.get("items");
+        assertThat(items).containsEntry("type", "string");
+
+        assertThat(schema.required()).isNull();
+    }
+
+    @Test
     void builderIsFluent() {
         JsonSchemaBuilder builder = JsonSchemaBuilder.object();
 
@@ -138,5 +160,6 @@ class JsonSchemaBuilderTest {
         assertThat(builder.optionalInteger("d", "desc")).isSameAs(builder);
         assertThat(builder.requiredBoolean("e", "desc")).isSameAs(builder);
         assertThat(builder.optionalBoolean("f", "desc")).isSameAs(builder);
+        assertThat(builder.optionalStringArray("g", "desc")).isSameAs(builder);
     }
 }

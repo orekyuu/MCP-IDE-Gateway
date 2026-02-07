@@ -43,7 +43,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         return JsonSchemaBuilder.object()
                 .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalString("filePath", "Absolute path to a specific file to inspect (optional, inspects entire project if not specified)")
-                .optionalString("inspectionName", "Name of a specific inspection to run (optional, runs all enabled inspections if not specified)")
+                .optionalStringArray("inspectionNames", "Names of specific inspections to run (optional, runs all enabled inspections if not specified)")
                 .optionalString("minSeverity", "Minimum severity level to report: ERROR, WARNING, WEAK_WARNING, or INFO (default: INFO, reports all)")
                 .optionalInteger("maxProblems", "Maximum number of problems to report (default: 100)")
                 .optionalInteger("timeout", "Timeout in seconds (default: 60). Returns partial results if timeout is reached.")
@@ -61,7 +61,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: projectPath is required");
             }
-            Optional<String> inspectionName = getStringArg(arguments, "inspectionName");
+            List<String> inspectionNames = getStringListArg(arguments, "inspectionNames");
             String minSeverity = getStringArg(arguments, "minSeverity").orElse("INFO");
             int minSeverityLevel = getSeverityLevel(minSeverity);
             int maxProblems = arguments.containsKey("maxProblems")
@@ -108,13 +108,12 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
             // Run inspections
             final List<InspectionProblem> problems = Collections.synchronizedList(new ArrayList<>());
-            String inspName = inspectionName.orElse(null);
             boolean[] timedOut = {false};
 
             PsiFile targetFile = targetFileRef.get();
             if (targetFile != null) {
                 // Inspect single file
-                collectProblemsFromFile(project, profile, targetFile, inspName, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
+                collectProblemsFromFile(project, profile, targetFile, inspectionNames, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
             } else {
                 // Inspect project - collect files first, then process
                 List<VirtualFile> filesToInspect = ReadAction.compute(() -> {
@@ -147,7 +146,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     // Get PsiFile in a small read action
                     PsiFile psiFile = ReadAction.compute(() -> psiManager.findFile(file));
                     if (psiFile != null) {
-                        collectProblemsFromFile(project, profile, psiFile, inspName, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
+                        collectProblemsFromFile(project, profile, psiFile, inspectionNames, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
                     }
                 }
             }
@@ -185,7 +184,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     }
 
     private void collectProblemsFromFile(Project project, InspectionProfileImpl profile,
-                                         PsiFile psiFile, String inspectionName,
+                                         PsiFile psiFile, List<String> inspectionNames,
                                          int minSeverityLevel, int maxProblems,
                                          List<InspectionProblem> problems,
                                          long startTime, long timeoutMillis, boolean[] timedOut) {
@@ -199,7 +198,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         ReadAction.run(() -> {
             for (InspectionToolWrapper<?, ?> wrapper : profile.getInspectionTools(psiFile)) {
                 if (!profile.isToolEnabled(wrapper.getDisplayKey(), psiFile)) continue;
-                if (!matchesInspectionName(wrapper, inspectionName)) continue;
+                if (!matchesInspectionNames(wrapper, inspectionNames)) continue;
 
                 if (wrapper instanceof LocalInspectionToolWrapper localWrapper) {
                     localTools.add(localWrapper);
@@ -332,10 +331,14 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         };
     }
 
-    private boolean matchesInspectionName(InspectionToolWrapper<?, ?> toolWrapper, String inspectionName) {
-        if (inspectionName == null) return true;
-        return toolWrapper.getShortName().toLowerCase().contains(inspectionName.toLowerCase())
-                || toolWrapper.getDisplayName().toLowerCase().contains(inspectionName.toLowerCase());
+    private boolean matchesInspectionNames(InspectionToolWrapper<?, ?> toolWrapper, List<String> inspectionNames) {
+        if (inspectionNames == null || inspectionNames.isEmpty()) return true;
+        String shortName = toolWrapper.getShortName().toLowerCase();
+        String displayName = toolWrapper.getDisplayName().toLowerCase();
+        return inspectionNames.stream().anyMatch(name -> {
+            String lowerName = name.toLowerCase();
+            return shortName.contains(lowerName) || displayName.contains(lowerName);
+        });
     }
 
     private InspectionProblem createProblem(PsiFile psiFile, ProblemDescriptor descriptor,

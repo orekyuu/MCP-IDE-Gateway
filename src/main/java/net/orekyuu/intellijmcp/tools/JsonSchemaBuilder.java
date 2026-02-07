@@ -128,6 +128,22 @@ public class JsonSchemaBuilder {
     }
 
     /**
+     * Adds an optional string array property.
+     *
+     * @param name        the property name
+     * @param description the property description
+     * @return this builder for chaining
+     */
+    public JsonSchemaBuilder optionalStringArray(String name, String description) {
+        properties.put(name, Map.of(
+                "type", "array",
+                "items", Map.of("type", "string"),
+                "description", description
+        ));
+        return this;
+    }
+
+    /**
      * Builds the JsonSchema instance.
      *
      * @return the built JsonSchema

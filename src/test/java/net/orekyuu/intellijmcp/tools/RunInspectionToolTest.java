@@ -36,7 +36,7 @@ public class RunInspectionToolTest extends BasePlatformTestCase {
                 .isNotNull()
                 .containsKey("filePath")
                 .containsKey("projectPath")
-                .containsKey("inspectionName");
+                .containsKey("inspectionNames");
         assertThat(schema.required())
                 .isNotNull()
                 .contains("projectPath");
