@@ -37,9 +37,9 @@ jobs:
       - name: Get Plugin Info
         id: plugin_info
         run: |
-          echo "version=$(./gradlew properties --no-daemon --console=plain -q | grep "^version:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
-          echo "name=$(./gradlew properties --no-daemon --console=plain -q | grep "^pluginName:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
-          echo "build_dir=$(./gradlew properties --no-daemon --console=plain -q | grep "^buildDir:" | awk '{printf $2}')" >> $GITHUB_OUTPUT
+          ZIP_FILE=$(ls build/distributions/*.zip | head -1)
+          echo "zip_path=$ZIP_FILE" >> $GITHUB_OUTPUT
+          echo "zip_name=$(basename $ZIP_FILE)" >> $GITHUB_OUTPUT
 
       - name: Extract Tag Date
         id: tag_date
@@ -67,8 +67,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.plugin_info.outputs.build_dir }}/distributions/${{ steps.plugin_info.outputs.name }}-${{ steps.plugin_info.outputs.version }}.zip
-          asset_name: ${{ steps.plugin_info.outputs.name }}-${{ steps.plugin_info.outputs.version }}.zip
+          asset_path: ${{ steps.plugin_info.outputs.zip_path }}
+          asset_name: ${{ steps.plugin_info.outputs.zip_name }}
           asset_content_type: application/zip
 
       - name: Upload Build Reports (Optional)
