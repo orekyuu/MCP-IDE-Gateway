@@ -5,6 +5,9 @@ on:
     tags:
       - 'v-*'  # v-yyyyMMdd 形式のタグ
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
