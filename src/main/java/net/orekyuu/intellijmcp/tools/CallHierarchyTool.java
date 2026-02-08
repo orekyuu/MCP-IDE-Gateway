@@ -4,18 +4,16 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
 
-import java.nio.file.Paths;
 import java.util.*;
 
 /**
- * MCP tool that retrieves call hierarchy for a method at a given location.
+ * MCP tool that retrieves call hierarchy for a method by class name and member name.
  * Returns callers of the specified method using ReferencesSearch.
  * Uses ReadAction.nonBlocking() for better performance on large projects.
  */
@@ -32,14 +30,14 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
 
     @Override
     public String getDescription() {
-        return "Get call hierarchy (callers) for a method at the specified file and offset position";
+        return "Get call hierarchy (callers) for a method by class name and method name";
     }
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
-                .requiredString("filePath", "Absolute path to the file containing the method")
-                .requiredInteger("offset", "Character offset position in the file where the method is located")
+                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
+                .requiredString("memberName", "Method name to get call hierarchy for")
                 .requiredString("projectPath", "Absolute path to the project root directory")
                 .optionalInteger("depth", "Maximum depth of the hierarchy to retrieve (default: 3, max: 10)")
                 .build();
@@ -49,13 +47,12 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
     public Result<ErrorResponse, CallHierarchyResponse> execute(Map<String, Object> arguments) {
         try {
             // Get arguments
-            String filePath;
-            int offset;
+            String className;
+            String memberName;
             String projectPath;
             try {
-                filePath = getRequiredStringArg(arguments, "filePath");
-                offset = getIntegerArg(arguments, "offset")
-                        .orElseThrow(() -> new IllegalArgumentException("offset is required"));
+                className = getRequiredStringArg(arguments, "className");
+                memberName = getRequiredStringArg(arguments, "memberName");
                 projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
@@ -71,47 +68,27 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
             }
             Project project = projectOpt.get();
 
-            // Find file and method using ReadAction
+            // Resolve element
             final int finalDepth = depth;
-            PsiMethod method = runReadAction(() -> {
-                VirtualFile virtualFile = VirtualFileManager.getInstance()
-                        .findFileByNioPath(Paths.get(filePath));
-                if (virtualFile == null) {
-                    return null;
-                }
+            PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
+                    PsiElementResolver.resolve(project, className, Optional.of(memberName)));
 
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
-                if (psiFile == null) {
-                    return null;
-                }
-
-                PsiElement element = psiFile.findElementAt(offset);
-                if (element == null) {
-                    return null;
-                }
-
-                PsiMethod foundMethod = PsiTreeUtil.getParentOfType(element, PsiMethod.class, false);
-                if (foundMethod == null) {
-                    PsiReference reference = psiFile.findReferenceAt(offset);
-                    if (reference != null) {
-                        PsiElement resolved = reference.resolve();
-                        if (resolved instanceof PsiMethod) {
-                            foundMethod = (PsiMethod) resolved;
-                        }
+            return switch (resolveResult) {
+                case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                        errorResult("Error: Class not found: " + r.className());
+                case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                        errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                case PsiElementResolver.ResolveResult.Success r -> {
+                    if (!(r.element() instanceof PsiMethod method)) {
+                        yield errorResult("Error: '" + memberName + "' is not a method. Call hierarchy is only available for methods.");
                     }
+
+                    // Build call hierarchy
+                    Set<PsiMethod> visited = new HashSet<>();
+                    MethodInfo methodInfo = buildCallHierarchy(project, method, finalDepth, visited);
+                    yield successResult(new CallHierarchyResponse(methodInfo));
                 }
-                return foundMethod;
-            });
-
-            if (method == null) {
-                return errorResult("Error: No method found at the specified position. " +
-                        "Make sure the offset points to a method declaration or reference.");
-            }
-
-            // Build call hierarchy using ReadAction.nonBlocking() for heavy search operations
-            Set<PsiMethod> visited = new HashSet<>();
-            MethodInfo methodInfo = buildCallHierarchy(project, method, finalDepth, visited);
-            return successResult(new CallHierarchyResponse(methodInfo));
+            };
 
         } catch (Exception e) {
             LOG.error("Error in get_call_hierarchy tool", e);

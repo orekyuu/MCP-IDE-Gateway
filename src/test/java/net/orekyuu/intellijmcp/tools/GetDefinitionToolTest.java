@@ -34,36 +34,25 @@ public class GetDefinitionToolTest extends BasePlatformTestCase {
         assertThat(schema.type()).isEqualTo("object");
         assertThat(schema.properties())
                 .isNotNull()
-                .containsKey("filePath")
-                .containsKey("offset")
+                .containsKey("className")
                 .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath", "offset", "projectPath");
+                .contains("className", "projectPath");
     }
 
-    public void testExecuteWithMissingFilePath() {
-        var result = tool.execute(Map.of("offset", 0, "projectPath", "/some/path"));
+    public void testExecuteWithMissingClassName() {
+        var result = tool.execute(Map.of("projectPath", "/some/path"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDefinitionTool.GetDefinitionResponse>) result;
-        assertThat(errorResult.message().message()).contains("filePath");
-    }
-
-    public void testExecuteWithMissingOffset() {
-        var result = tool.execute(Map.of("filePath", "/some/path.java", "projectPath", "/some/path"));
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, GetDefinitionTool.GetDefinitionResponse>) result;
-        assertThat(errorResult.message().message()).contains("offset");
+        assertThat(errorResult.message().message()).contains("className");
     }
 
     public void testExecuteWithMissingProjectPath() {
-        var result = tool.execute(Map.of("filePath", "/some/path.java", "offset", 0));
+        var result = tool.execute(Map.of("className", "com.example.MyClass"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
@@ -74,8 +63,7 @@ public class GetDefinitionToolTest extends BasePlatformTestCase {
 
     public void testExecuteWithNonExistentProject() {
         var result = tool.execute(Map.of(
-                "filePath", "/nonexistent/path/to/file.java",
-                "offset", 0,
+                "className", "com.example.MyClass",
                 "projectPath", "/nonexistent/project/path"
         ));
 

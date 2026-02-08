@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
-import com.intellij.psi.search.GlobalSearchScope;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.Map;
@@ -60,107 +59,61 @@ public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSour
                 }
                 Project project = projectOpt.get();
 
-                // Find class
-                GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-                PsiClass psiClass = JavaPsiFacade.getInstance(project).findClass(className, scope);
+                // Resolve element using PsiElementResolver
+                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName);
 
-                if (psiClass == null) {
-                    return errorResult("Error: Class not found: " + className);
-                }
+                return switch (resolveResult) {
+                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                            errorResult("Error: Class not found: " + r.className());
+                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                    case PsiElementResolver.ResolveResult.Success r -> {
+                        PsiElement targetElement = r.element();
+                        String kind = r.kind();
+                        String name = r.name();
 
-                // Find target element
-                PsiElement targetElement;
-                String kind;
-                String name;
+                        // Get source code
+                        String sourceCode = targetElement.getText();
 
-                if (memberName.isEmpty()) {
-                    targetElement = psiClass;
-                    kind = getClassKind(psiClass);
-                    name = psiClass.getName();
-                } else {
-                    String member = memberName.get();
+                        // Get file path and line range
+                        String filePath = null;
+                        LineRange lineRange = null;
 
-                    // Try to find method first
-                    PsiMethod[] methods = psiClass.findMethodsByName(member, false);
-                    if (methods.length > 0) {
-                        targetElement = methods[0];
-                        kind = methods[0].isConstructor() ? "constructor" : "method";
-                        name = member;
-                    } else {
-                        // Try to find field
-                        PsiField field = psiClass.findFieldByName(member, false);
-                        if (field != null) {
-                            targetElement = field;
-                            kind = "field";
-                            name = member;
-                        } else {
-                            // Try to find inner class
-                            PsiClass innerClass = psiClass.findInnerClassByName(member, false);
-                            if (innerClass != null) {
-                                targetElement = innerClass;
-                                kind = getClassKind(innerClass);
-                                name = member;
-                            } else {
-                                return errorResult("Error: Member '" + member + "' not found in class: " + className);
+                        PsiFile containingFile = targetElement.getContainingFile();
+                        if (containingFile != null) {
+                            VirtualFile virtualFile = containingFile.getVirtualFile();
+                            if (virtualFile != null) {
+                                filePath = virtualFile.getPath();
+                            }
+
+                            var textRange = targetElement.getTextRange();
+                            if (textRange != null) {
+                                com.intellij.openapi.editor.Document document =
+                                        PsiDocumentManager.getInstance(project).getDocument(containingFile);
+                                if (document != null) {
+                                    int startLine = document.getLineNumber(textRange.getStartOffset()) + 1;
+                                    int endLine = document.getLineNumber(textRange.getEndOffset()) + 1;
+                                    lineRange = new LineRange(startLine, endLine);
+                                }
                             }
                         }
+
+                        yield successResult(new GetSourceCodeResponse(
+                                name,
+                                kind,
+                                className,
+                                sourceCode,
+                                filePath,
+                                lineRange
+                        ));
                     }
-                }
-
-                // Get source code
-                String sourceCode = targetElement.getText();
-
-                // Get file path and line range
-                String filePath = null;
-                LineRange lineRange = null;
-
-                PsiFile containingFile = targetElement.getContainingFile();
-                if (containingFile != null) {
-                    VirtualFile virtualFile = containingFile.getVirtualFile();
-                    if (virtualFile != null) {
-                        filePath = virtualFile.getPath();
-                    }
-
-                    var textRange = targetElement.getTextRange();
-                    if (textRange != null) {
-                        com.intellij.openapi.editor.Document document =
-                                PsiDocumentManager.getInstance(project).getDocument(containingFile);
-                        if (document != null) {
-                            int startLine = document.getLineNumber(textRange.getStartOffset()) + 1;
-                            int endLine = document.getLineNumber(textRange.getEndOffset()) + 1;
-                            lineRange = new LineRange(startLine, endLine);
-                        }
-                    }
-                }
-
-                return successResult(new GetSourceCodeResponse(
-                        name,
-                        kind,
-                        className,
-                        sourceCode,
-                        filePath,
-                        lineRange
-                ));
+                };
 
             } catch (Exception e) {
                 LOG.error("Error in get_source_code tool", e);
                 return errorResult("Error: " + e.getMessage());
             }
         });
-    }
-
-    private String getClassKind(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     public record GetSourceCodeResponse(

@@ -3,16 +3,14 @@ package net.orekyuu.intellijmcp.tools;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
 import io.modelcontextprotocol.spec.McpSchema;
 
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * MCP tool that retrieves the definition location of a symbol at a given position.
+ * MCP tool that retrieves the definition location of a symbol by class name and optional member name.
  * Returns the file path, line range, and symbol information where the symbol is defined.
  */
 public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefinitionResponse> {
@@ -26,14 +24,14 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
 
     @Override
     public String getDescription() {
-        return "Get the definition location of a symbol at the specified file and offset position";
+        return "Get the definition location of a symbol by class name and optional member name";
     }
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
-                .requiredString("filePath", "Absolute path to the file containing the symbol")
-                .requiredInteger("offset", "Character offset position in the file where the symbol is located")
+                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
+                .optionalString("memberName", "Method, field, or inner class name. If not specified, returns the class definition")
                 .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
@@ -43,17 +41,16 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
         return runReadActionWithResult(() -> {
             try {
                 // Get arguments
-                String filePath;
-                int offset;
+                String className;
                 String projectPath;
                 try {
-                    filePath = getRequiredStringArg(arguments, "filePath");
-                    offset = getIntegerArg(arguments, "offset")
-                            .orElseThrow(() -> new IllegalArgumentException("offset is required"));
+                    className = getRequiredStringArg(arguments, "className");
                     projectPath = getRequiredStringArg(arguments, "projectPath");
                 } catch (IllegalArgumentException e) {
                     return errorResult("Error: " + e.getMessage());
                 }
+
+                Optional<String> memberName = getStringArg(arguments, "memberName");
 
                 // Find project
                 Optional<Project> projectOpt = findProjectByPath(projectPath);
@@ -62,47 +59,22 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
                 }
                 Project project = projectOpt.get();
 
-                // Find file
-                VirtualFile virtualFile = VirtualFileManager.getInstance()
-                        .findFileByNioPath(Paths.get(filePath));
-                if (virtualFile == null) {
-                    return errorResult("Error: File not found: " + filePath);
-                }
+                // Resolve element
+                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName);
 
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
-                if (psiFile == null) {
-                    return errorResult("Error: Could not parse file: " + filePath);
-                }
-
-                // Find reference at offset
-                PsiReference reference = psiFile.findReferenceAt(offset);
-                if (reference == null) {
-                    // Try to find element at offset and check if it's already a declaration
-                    PsiElement element = psiFile.findElementAt(offset);
-                    if (element != null) {
-                        PsiElement parent = element.getParent();
-                        if (parent instanceof PsiNamedElement namedElement) {
-                            DefinitionInfo info = createDefinitionInfo(namedElement);
-                            if (info != null) {
-                                return successResult(new GetDefinitionResponse(info));
-                            }
+                return switch (resolveResult) {
+                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                            errorResult("Error: Class not found: " + r.className());
+                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                    case PsiElementResolver.ResolveResult.Success r -> {
+                        DefinitionInfo info = createDefinitionInfo(r.element());
+                        if (info == null) {
+                            yield errorResult("Error: Could not get definition information");
                         }
+                        yield successResult(new GetDefinitionResponse(info));
                     }
-                    return errorResult("Error: No symbol found at the specified position");
-                }
-
-                // Resolve reference to get definition
-                PsiElement resolved = reference.resolve();
-                if (resolved == null) {
-                    return errorResult("Error: Could not resolve symbol definition");
-                }
-
-                DefinitionInfo info = createDefinitionInfo(resolved);
-                if (info == null) {
-                    return errorResult("Error: Could not get definition information");
-                }
-
-                return successResult(new GetDefinitionResponse(info));
+                };
 
             } catch (Exception e) {
                 LOG.error("Error in get_definition tool", e);

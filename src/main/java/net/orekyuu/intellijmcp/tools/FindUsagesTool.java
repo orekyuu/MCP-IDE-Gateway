@@ -4,18 +4,16 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
 
-import java.nio.file.Paths;
 import java.util.*;
 
 /**
- * MCP tool that finds all usages of a symbol at a given position.
+ * MCP tool that finds all usages of a symbol by class name and optional member name.
  * Returns the list of locations where the symbol is referenced.
  */
 public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesResponse> {
@@ -29,14 +27,14 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
 
     @Override
     public String getDescription() {
-        return "Find all usages of a symbol at the specified file and offset position";
+        return "Find all usages of a symbol by class name and optional member name";
     }
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
         return JsonSchemaBuilder.object()
-                .requiredString("filePath", "Absolute path to the file containing the symbol")
-                .requiredInteger("offset", "Character offset position in the file where the symbol is located")
+                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
+                .optionalString("memberName", "Method, field, or inner class name. If not specified, finds usages of the class itself")
                 .requiredString("projectPath", "Absolute path to the project root directory")
                 .build();
     }
@@ -45,17 +43,16 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
     public Result<ErrorResponse, FindUsagesResponse> execute(Map<String, Object> arguments) {
         try {
             // Get arguments
-            String filePath;
-            int offset;
+            String className;
             String projectPath;
             try {
-                filePath = getRequiredStringArg(arguments, "filePath");
-                offset = getIntegerArg(arguments, "offset")
-                        .orElseThrow(() -> new IllegalArgumentException("offset is required"));
+                className = getRequiredStringArg(arguments, "className");
                 projectPath = getRequiredStringArg(arguments, "projectPath");
             } catch (IllegalArgumentException e) {
                 return errorResult("Error: " + e.getMessage());
             }
+
+            Optional<String> memberName = getStringArg(arguments, "memberName");
 
             // Find project
             Optional<Project> projectOpt = findProjectByPath(projectPath);
@@ -64,42 +61,25 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
             }
             Project project = projectOpt.get();
 
-            // Find the target element
+            // Resolve the target element
             PsiElement targetElement = runReadAction(() -> {
-                VirtualFile virtualFile = VirtualFileManager.getInstance()
-                        .findFileByNioPath(Paths.get(filePath));
-                if (virtualFile == null) {
-                    return null;
+                PsiElementResolver.ResolveResult result = PsiElementResolver.resolve(project, className, memberName);
+                if (result instanceof PsiElementResolver.ResolveResult.Success s) {
+                    return s.element();
                 }
-
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
-                if (psiFile == null) {
-                    return null;
-                }
-
-                // Try to find reference and resolve it
-                PsiReference reference = psiFile.findReferenceAt(offset);
-                if (reference != null) {
-                    PsiElement resolved = reference.resolve();
-                    if (resolved != null) {
-                        return resolved;
-                    }
-                }
-
-                // Try to find element directly (for declarations)
-                PsiElement element = psiFile.findElementAt(offset);
-                if (element != null) {
-                    PsiElement parent = element.getParent();
-                    if (parent instanceof PsiNamedElement) {
-                        return parent;
-                    }
-                }
-
                 return null;
             });
 
             if (targetElement == null) {
-                return errorResult("Error: No symbol found at the specified position");
+                PsiElementResolver.ResolveResult result = runReadAction(() -> PsiElementResolver.resolve(project, className, memberName));
+                return switch (result) {
+                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                            errorResult("Error: Class not found: " + r.className());
+                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                    case PsiElementResolver.ResolveResult.Success s ->
+                            errorResult("Error: Unexpected state");
+                };
             }
 
             // Get symbol info

@@ -34,31 +34,27 @@ public class RenameSymbolToolTest extends BasePlatformTestCase {
         assertThat(schema.type()).isEqualTo("object");
         assertThat(schema.properties())
                 .isNotNull()
-                .containsKey("filePath")
-                .containsKey("line")
-                .containsKey("column")
+                .containsKey("className")
                 .containsKey("newName")
                 .containsKey("projectPath");
         assertThat(schema.required())
                 .isNotNull()
-                .contains("filePath", "line", "column", "newName", "projectPath");
+                .contains("className", "newName", "projectPath");
     }
 
-    public void testExecuteWithMissingFilePath() {
-        var result = tool.execute(Map.of("projectPath", "/some/path"));
+    public void testExecuteWithMissingClassName() {
+        var result = tool.execute(Map.of("projectPath", "/some/path", "newName", "newSymbolName"));
 
         assertThat(result).isNotNull();
         assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, RenameSymbolTool.RenameSymbolResponse>) result;
-        assertThat(errorResult.message().message()).contains("filePath");
+        assertThat(errorResult.message().message()).contains("className");
     }
 
     public void testExecuteWithMissingProjectPath() {
         var result = tool.execute(Map.of(
-                "filePath", "/some/file.java",
-                "line", 1,
-                "column", 1,
+                "className", "com.example.MyClass",
                 "newName", "newSymbolName"
         ));
 
