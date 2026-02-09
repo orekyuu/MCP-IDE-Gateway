@@ -6,6 +6,7 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileVisitor;
@@ -79,7 +80,7 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
                     VfsUtilCore.visitChildrenRecursively(root, new VirtualFileVisitor<Void>() {
                         @Override
                         public boolean visitFile(@NotNull VirtualFile file) {
-                            if (!file.isDirectory() && isSourceFile(file) && !processedFiles.contains(file)) {
+                            if (!file.isDirectory() && isSourceFile(project, file) && !processedFiles.contains(file)) {
                                 processedFiles.add(file);
 
                                 if (problemSolver.isProblemFile(file)) {
@@ -118,14 +119,8 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
         });
     }
 
-    private boolean isSourceFile(VirtualFile file) {
-        String extension = file.getExtension();
-        return extension != null && (
-                extension.equals("java") ||
-                extension.equals("kt") ||
-                extension.equals("scala") ||
-                extension.equals("groovy")
-        );
+    private boolean isSourceFile(Project project, VirtualFile file) {
+        return ProjectFileIndex.getInstance(project).isInSourceContent(file);
     }
 
     @SuppressWarnings("UnstableApiUsage")
