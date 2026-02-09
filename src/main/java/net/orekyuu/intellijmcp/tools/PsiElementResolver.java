@@ -3,6 +3,7 @@ package net.orekyuu.intellijmcp.tools;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.PsiShortNamesCache;
 
 import java.util.Optional;
 
@@ -29,7 +30,7 @@ public final class PsiElementResolver {
      */
     public static ResolveResult resolve(Project project, String className, Optional<String> memberName) {
         GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-        PsiClass psiClass = JavaPsiFacade.getInstance(project).findClass(className, scope);
+        PsiClass psiClass = findClass(project, className, scope);
 
         if (psiClass == null) {
             return new ResolveResult.ClassNotFound(className);
@@ -62,7 +63,27 @@ public final class PsiElementResolver {
         return new ResolveResult.MemberNotFound(member, className);
     }
 
-    private static String getClassKind(PsiClass psiClass) {
+    /**
+     * Finds a PsiClass by name, supporting both fully qualified names and simple names.
+     *
+     * @param project   the IntelliJ project
+     * @param className fully qualified or simple class name
+     * @param scope     the search scope
+     * @return the found PsiClass, or null if not found
+     */
+    public static PsiClass findClass(Project project, String className, GlobalSearchScope scope) {
+        // FQN search
+        if (className.contains(".")) {
+            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
+            if (classes.length > 0) return classes[0];
+        }
+        // Short name fallback
+        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
+        if (classes.length > 0) return classes[0];
+        return null;
+    }
+
+    static String getClassKind(PsiClass psiClass) {
         if (psiClass.isInterface()) {
             return "interface";
         } else if (psiClass.isEnum()) {

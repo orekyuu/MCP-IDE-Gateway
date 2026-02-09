@@ -5,7 +5,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.PsiShortNamesCache;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.*;
@@ -62,7 +61,7 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
 
                 // Find the class
                 GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-                PsiClass psiClass = findClass(project, className, scope);
+                PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
 
                 if (psiClass == null) {
                     return errorResult("Error: Class not found: " + className);
@@ -80,28 +79,10 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
         });
     }
 
-    private PsiClass findClass(Project project, String className, GlobalSearchScope scope) {
-        // Try fully qualified name first
-        if (className.contains(".")) {
-            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
-            if (classes.length > 0) {
-                return classes[0];
-            }
-        }
-
-        // Try simple name
-        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
-        if (classes.length > 0) {
-            return classes[0];
-        }
-
-        return null;
-    }
-
     private ClassStructure buildClassStructure(PsiClass psiClass, boolean includeInherited) {
         String name = psiClass.getName();
         String qualifiedName = psiClass.getQualifiedName();
-        String classType = getClassType(psiClass);
+        String classType = PsiElementResolver.getClassKind(psiClass);
         String filePath = null;
         LineRange lineRange = null;
 
@@ -204,7 +185,7 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
 
     private InnerClassInfo createInnerClassInfo(PsiClass innerClass) {
         String name = innerClass.getName();
-        String classType = getClassType(innerClass);
+        String classType = PsiElementResolver.getClassKind(innerClass);
         List<String> modifiers = getModifiers(innerClass.getModifierList());
         LineRange lineRange = getLineRange(innerClass);
 
@@ -246,20 +227,6 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
         if (modifierList.hasModifierProperty(PsiModifier.NATIVE)) modifiers.add("native");
 
         return modifiers;
-    }
-
-    private String getClassType(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     // Response and data records

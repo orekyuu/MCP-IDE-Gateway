@@ -6,7 +6,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.PsiShortNamesCache;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
 import io.modelcontextprotocol.spec.McpSchema;
 
@@ -61,7 +60,8 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
             Project project = projectOpt.get();
 
             // Find the target class
-            PsiClass targetClass = runReadAction(() -> findClass(project, className));
+            PsiClass targetClass = runReadAction(() ->
+                    PsiElementResolver.findClass(project, className, GlobalSearchScope.allScope(project)));
 
             if (targetClass == null) {
                 return errorResult("Error: Class not found: " + className);
@@ -97,30 +97,10 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
         }
     }
 
-    private PsiClass findClass(Project project, String className) {
-        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-
-        // Try fully qualified name first
-        if (className.contains(".")) {
-            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
-            if (classes.length > 0) {
-                return classes[0];
-            }
-        }
-
-        // Try simple name
-        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
-        if (classes.length > 0) {
-            return classes[0];
-        }
-
-        return null;
-    }
-
     private ClassInfo createClassInfo(PsiClass psiClass) {
         String name = psiClass.getName();
         String qualifiedName = psiClass.getQualifiedName();
-        String classType = getClassType(psiClass);
+        String classType = PsiElementResolver.getClassKind(psiClass);
         String filePath = null;
         LineRange lineRange = null;
         List<String> modifiers = getModifiers(psiClass.getModifierList());
@@ -160,20 +140,6 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
         if (modifierList.hasModifierProperty(PsiModifier.FINAL)) modifiers.add("final");
 
         return modifiers;
-    }
-
-    private String getClassType(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     public record GetImplementationsResponse(

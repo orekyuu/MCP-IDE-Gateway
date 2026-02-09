@@ -7,7 +7,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.PsiShortNamesCache;
+import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.*;
@@ -85,14 +85,13 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             String[] parts = symbolName.split("#", 2);
             className = parts[0];
             memberName = parts[1];
-        } else if (symbolName.contains(".") && !isFullyQualifiedClassName(project, symbolName, scope)) {
-            // Try to split at last dot for member access
+        } else if (symbolName.contains(".") && PsiElementResolver.findClass(project, symbolName, scope) == null) {
+            // Not a fully qualified class name — try to split at last dot for member access
             int lastDot = symbolName.lastIndexOf('.');
             String potentialClass = symbolName.substring(0, lastDot);
             String potentialMember = symbolName.substring(lastDot + 1);
 
-            PsiClass psiClass = findClass(project, potentialClass, scope);
-            if (psiClass != null) {
+            if (PsiElementResolver.findClass(project, potentialClass, scope) != null) {
                 className = potentialClass;
                 memberName = potentialMember;
             } else {
@@ -102,67 +101,34 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             className = symbolName;
         }
 
-        // Find the class
-        PsiClass psiClass = findClass(project, className, scope);
-        if (psiClass == null) {
-            return null;
-        }
-
-        if (memberName != null) {
-            // Find member (method or field)
-            return findMemberDocumentation(psiClass, memberName);
-        } else {
-            // Return class documentation
-            return buildDocumentation(psiClass, psiClass.getName(), psiClass.getQualifiedName(), getClassType(psiClass));
-        }
-    }
-
-    private boolean isFullyQualifiedClassName(Project project, String name, GlobalSearchScope scope) {
-        if (!name.contains(".")) return false;
-        PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(name, scope);
-        return classes.length > 0;
-    }
-
-    private PsiClass findClass(Project project, String className, GlobalSearchScope scope) {
-        // Try fully qualified name first
-        if (className.contains(".")) {
-            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
-            if (classes.length > 0) {
-                return classes[0];
-            }
-        }
-
-        // Try simple name
-        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
-        if (classes.length > 0) {
-            return classes[0];
-        }
-
-        return null;
-    }
-
-    private Documentation findMemberDocumentation(PsiClass psiClass, String memberName) {
         // Remove parentheses if present (for method references)
-        String baseName = memberName.contains("(") ? memberName.substring(0, memberName.indexOf('(')) : memberName;
-
-        // Try methods first
-        for (PsiMethod method : psiClass.getMethods()) {
-            if (method.getName().equals(baseName)) {
-                PsiClass parent = method.getContainingClass();
-                String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + method.getName() : method.getName();
-                return buildDocumentation(method, method.getName(), qualifiedName, "method");
-            }
+        if (memberName != null && memberName.contains("(")) {
+            memberName = memberName.substring(0, memberName.indexOf('('));
         }
 
-        // Try fields
-        PsiField field = psiClass.findFieldByName(baseName, false);
-        if (field != null) {
-            PsiClass parent = field.getContainingClass();
-            String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + field.getName() : field.getName();
-            return buildDocumentation(field, field.getName(), qualifiedName, "field");
-        }
+        // Resolve using PsiElementResolver
+        PsiElementResolver.ResolveResult result =
+                PsiElementResolver.resolve(project, className, Optional.ofNullable(memberName));
 
-        return null;
+        return switch (result) {
+            case PsiElementResolver.ResolveResult.Success s ->
+                    buildDocumentation(s.element(), s.name(), getQualifiedName(s), s.kind());
+            case PsiElementResolver.ResolveResult.ClassNotFound cnf -> null;
+            case PsiElementResolver.ResolveResult.MemberNotFound mnf -> null;
+        };
+    }
+
+    private String getQualifiedName(PsiElementResolver.ResolveResult.Success result) {
+        PsiElement element = result.element();
+        if (element instanceof PsiClass psiClass) {
+            return psiClass.getQualifiedName();
+        }
+        // For members: "containingClass#memberName"
+        PsiClass parent = PsiTreeUtil.getParentOfType(element, PsiClass.class);
+        if (parent != null) {
+            return parent.getQualifiedName() + "#" + result.name();
+        }
+        return result.name();
     }
 
     private Documentation buildDocumentation(PsiElement element, String name, String qualifiedName, String symbolType) {
@@ -233,20 +199,6 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             return new LineRange(startLine, endLine);
         }
         return null;
-    }
-
-    private String getClassType(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     // Response and data records

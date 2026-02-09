@@ -5,7 +5,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.intellij.psi.search.PsiShortNamesCache;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
 import io.modelcontextprotocol.spec.McpSchema;
 
@@ -64,7 +63,7 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
 
                 // Find the class
                 GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-                PsiClass psiClass = findClass(project, className, scope);
+                PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
 
                 if (psiClass == null) {
                     return errorResult("Error: Class not found: " + className);
@@ -82,28 +81,10 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
         });
     }
 
-    private PsiClass findClass(Project project, String className, GlobalSearchScope scope) {
-        // Try fully qualified name first
-        if (className.contains(".")) {
-            PsiClass[] classes = JavaPsiFacade.getInstance(project).findClasses(className, scope);
-            if (classes.length > 0) {
-                return classes[0];
-            }
-        }
-
-        // Try simple name
-        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(className, scope);
-        if (classes.length > 0) {
-            return classes[0];
-        }
-
-        return null;
-    }
-
     private TypeHierarchy buildTypeHierarchy(PsiClass psiClass, GlobalSearchScope scope, boolean includeSubclasses) {
         String name = psiClass.getName();
         String qualifiedName = psiClass.getQualifiedName();
-        String classType = getClassType(psiClass);
+        String classType = PsiElementResolver.getClassKind(psiClass);
         String filePath = getFilePath(psiClass);
         LineRange lineRange = getLineRange(psiClass);
 
@@ -159,7 +140,7 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
         return new TypeInfo(
                 psiClass.getName(),
                 psiClass.getQualifiedName(),
-                getClassType(psiClass),
+                PsiElementResolver.getClassKind(psiClass),
                 getFilePath(psiClass),
                 getLineRange(psiClass)
         );
@@ -191,20 +172,6 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
             return new LineRange(startLine, endLine);
         }
         return null;
-    }
-
-    private String getClassType(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     // Response and data records

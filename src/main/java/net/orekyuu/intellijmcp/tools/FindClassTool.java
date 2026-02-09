@@ -100,7 +100,7 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
         String qualifiedName = psiClass.getQualifiedName();
         String filePath = null;
         LineRange lineRange = null;
-        String classType = getClassType(psiClass);
+        String classType = PsiElementResolver.getClassKind(psiClass);
 
         PsiFile containingFile = psiClass.getContainingFile();
         if (containingFile != null) {
@@ -121,20 +121,6 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
         }
 
         return new ClassInfo(name, qualifiedName, filePath, classType, lineRange);
-    }
-
-    private String getClassType(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     /**
