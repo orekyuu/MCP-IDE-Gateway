@@ -121,7 +121,7 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
         }
 
         if (element instanceof PsiClass psiClass) {
-            kind = getClassKind(psiClass);
+            kind = PsiElementResolver.getClassKind(psiClass);
             PsiClass parent = psiClass.getContainingClass();
             if (parent != null) {
                 containingClass = parent.getQualifiedName();
@@ -181,21 +181,10 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
             }
         }
 
-        // Determine usage type
-        PsiElement parent = element.getParent();
-        if (parent instanceof PsiMethodCallExpression) {
-            usageType = "method_call";
-        } else if (parent instanceof PsiNewExpression) {
-            usageType = "instantiation";
-        } else if (parent instanceof PsiAssignmentExpression assignment) {
-            if (assignment.getLExpression() == element ||
-                PsiTreeUtil.isAncestor(assignment.getLExpression(), element, false)) {
-                usageType = "write";
-            } else {
-                usageType = "read";
-            }
-        } else if (parent instanceof PsiReferenceExpression) {
-            usageType = "read";
+        // Determine usage type based on the resolved target element (language-independent)
+        PsiElement resolved = reference.resolve();
+        if (resolved instanceof PsiMethod) {
+            usageType = "call";
         }
 
         // Get containing method/class
@@ -212,20 +201,6 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
         }
 
         return new UsageInfo(filePath, lineRange, context, usageType, containingClass, containingMethod);
-    }
-
-    private String getClassKind(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     public record FindUsagesResponse(

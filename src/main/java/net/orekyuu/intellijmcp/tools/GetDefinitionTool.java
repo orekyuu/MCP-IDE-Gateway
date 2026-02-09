@@ -97,7 +97,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
 
         // Get kind and container
         if (element instanceof PsiClass psiClass) {
-            kind = getClassKind(psiClass);
+            kind = PsiElementResolver.getClassKind(psiClass);
             PsiClass parent = psiClass.getContainingClass();
             if (parent != null) {
                 containingClass = parent.getQualifiedName();
@@ -148,20 +148,6 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
         }
 
         return new DefinitionInfo(name, kind, containingClass, filePath, lineRange);
-    }
-
-    private String getClassKind(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     public record GetDefinitionResponse(DefinitionInfo definition) {}

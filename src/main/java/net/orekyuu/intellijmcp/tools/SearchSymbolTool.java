@@ -168,7 +168,7 @@ public class SearchSymbolTool extends AbstractMcpTool<SearchSymbolTool.SearchSym
 
         if (element instanceof PsiClass psiClass) {
             name = psiClass.getName();
-            kind = getClassKind(psiClass);
+            kind = PsiElementResolver.getClassKind(psiClass);
             PsiClass parent = psiClass.getContainingClass();
             if (parent != null) {
                 containingClass = parent.getQualifiedName();
@@ -238,20 +238,6 @@ public class SearchSymbolTool extends AbstractMcpTool<SearchSymbolTool.SearchSym
         sb.append(")");
 
         return sb.toString();
-    }
-
-    private String getClassKind(PsiClass psiClass) {
-        if (psiClass.isInterface()) {
-            return "interface";
-        } else if (psiClass.isEnum()) {
-            return "enum";
-        } else if (psiClass.isRecord()) {
-            return "record";
-        } else if (psiClass.isAnnotationType()) {
-            return "annotation";
-        } else {
-            return "class";
-        }
     }
 
     public record SearchSymbolResponse(
