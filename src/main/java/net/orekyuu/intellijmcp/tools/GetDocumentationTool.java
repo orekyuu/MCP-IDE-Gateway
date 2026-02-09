@@ -1,11 +1,11 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.codeInsight.documentation.DocumentationManager;
+import com.intellij.lang.documentation.DocumentationProvider;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
-import com.intellij.psi.javadoc.PsiDocComment;
-import com.intellij.psi.javadoc.PsiDocTag;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.PsiShortNamesCache;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -13,7 +13,7 @@ import io.modelcontextprotocol.spec.McpSchema;
 import java.util.*;
 
 /**
- * MCP tool that retrieves documentation (Javadoc) for a symbol.
+ * MCP tool that retrieves documentation for a symbol.
  */
 public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.DocumentationResponse> {
 
@@ -26,7 +26,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
 
     @Override
     public String getDescription() {
-        return "Get the documentation (Javadoc) of a class, method, or field";
+        return "Get the documentation of a class, method, or field";
     }
 
     @Override
@@ -113,7 +113,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             return findMemberDocumentation(psiClass, memberName);
         } else {
             // Return class documentation
-            return extractClassDocumentation(psiClass);
+            return buildDocumentation(psiClass, psiClass.getName(), psiClass.getQualifiedName(), getClassType(psiClass));
         }
     }
 
@@ -148,164 +148,63 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
         // Try methods first
         for (PsiMethod method : psiClass.getMethods()) {
             if (method.getName().equals(baseName)) {
-                return extractMethodDocumentation(method);
+                PsiClass parent = method.getContainingClass();
+                String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + method.getName() : method.getName();
+                return buildDocumentation(method, method.getName(), qualifiedName, "method");
             }
         }
 
         // Try fields
         PsiField field = psiClass.findFieldByName(baseName, false);
         if (field != null) {
-            return extractFieldDocumentation(field);
+            PsiClass parent = field.getContainingClass();
+            String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + field.getName() : field.getName();
+            return buildDocumentation(field, field.getName(), qualifiedName, "field");
         }
 
         return null;
     }
 
-    private Documentation extractClassDocumentation(PsiClass psiClass) {
-        PsiDocComment docComment = psiClass.getDocComment();
-        if (docComment == null) {
-            // Return basic info even without javadoc
-            return new Documentation(
-                    psiClass.getName(),
-                    psiClass.getQualifiedName(),
-                    "class",
-                    null,
-                    Collections.emptyList(),
-                    getFilePath(psiClass),
-                    getLineRange(psiClass)
-            );
-        }
-
-        String description = extractDescription(docComment);
-        List<DocTag> tags = extractTags(docComment);
-
-        return new Documentation(
-                psiClass.getName(),
-                psiClass.getQualifiedName(),
-                getClassType(psiClass),
-                description,
-                tags,
-                getFilePath(psiClass),
-                getLineRange(psiClass)
-        );
+    private Documentation buildDocumentation(PsiElement element, String name, String qualifiedName, String symbolType) {
+        String docText = generateDocumentation(element);
+        return new Documentation(name, qualifiedName, symbolType, docText, getFilePath(element), getLineRange(element));
     }
 
-    private Documentation extractMethodDocumentation(PsiMethod method) {
-        PsiDocComment docComment = method.getDocComment();
-
-        String signature = buildMethodSignature(method);
-        PsiClass parent = method.getContainingClass();
-        String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + method.getName() : method.getName();
-
-        if (docComment == null) {
-            return new Documentation(
-                    method.getName(),
-                    qualifiedName,
-                    "method",
-                    null,
-                    Collections.emptyList(),
-                    getFilePath(method),
-                    getLineRange(method)
-            );
+    private String generateDocumentation(PsiElement element) {
+        DocumentationProvider provider = DocumentationManager.getProviderFromElement(element);
+        if (provider == null) {
+            return null;
         }
-
-        String description = extractDescription(docComment);
-        List<DocTag> tags = extractTags(docComment);
-
-        return new Documentation(
-                method.getName(),
-                qualifiedName,
-                "method",
-                description,
-                tags,
-                getFilePath(method),
-                getLineRange(method)
-        );
+        String html = provider.generateDoc(element, null);
+        return html != null ? stripHtml(html) : null;
     }
 
-    private Documentation extractFieldDocumentation(PsiField field) {
-        PsiDocComment docComment = field.getDocComment();
+    private String stripHtml(String html) {
+        // Convert block-level elements to newlines
+        String text = html.replaceAll("(?i)<br\\s*/?>", "\n");
+        text = text.replaceAll("(?i)</p>", "\n\n");
+        text = text.replaceAll("(?i)</div>", "\n");
+        text = text.replaceAll("(?i)</li>", "\n");
+        text = text.replaceAll("(?i)</tr>", "\n");
+        text = text.replaceAll("(?i)<li>", "- ");
 
-        PsiClass parent = field.getContainingClass();
-        String qualifiedName = parent != null ? parent.getQualifiedName() + "#" + field.getName() : field.getName();
+        // Remove all remaining HTML tags
+        text = text.replaceAll("<[^>]+>", "");
 
-        if (docComment == null) {
-            return new Documentation(
-                    field.getName(),
-                    qualifiedName,
-                    "field",
-                    null,
-                    Collections.emptyList(),
-                    getFilePath(field),
-                    getLineRange(field)
-            );
-        }
+        // Decode common HTML entities
+        text = text.replace("&amp;", "&");
+        text = text.replace("&lt;", "<");
+        text = text.replace("&gt;", ">");
+        text = text.replace("&quot;", "\"");
+        text = text.replace("&apos;", "'");
+        text = text.replace("&nbsp;", " ");
 
-        String description = extractDescription(docComment);
-        List<DocTag> tags = extractTags(docComment);
+        // Normalize whitespace: collapse multiple spaces/tabs on same line
+        text = text.replaceAll("[ \\t]+", " ");
+        // Collapse 3+ consecutive newlines into 2
+        text = text.replaceAll("\\n{3,}", "\n\n");
 
-        return new Documentation(
-                field.getName(),
-                qualifiedName,
-                "field",
-                description,
-                tags,
-                getFilePath(field),
-                getLineRange(field)
-        );
-    }
-
-    private String extractDescription(PsiDocComment docComment) {
-        StringBuilder sb = new StringBuilder();
-        for (PsiElement element : docComment.getDescriptionElements()) {
-            String text = element.getText().trim();
-            if (!text.isEmpty()) {
-                if (!sb.isEmpty()) sb.append(" ");
-                sb.append(text);
-            }
-        }
-        return !sb.isEmpty() ? sb.toString() : null;
-    }
-
-    private List<DocTag> extractTags(PsiDocComment docComment) {
-        List<DocTag> tags = new ArrayList<>();
-        for (PsiDocTag tag : docComment.getTags()) {
-            String name = tag.getName();
-            String value = getTagValue(tag);
-            tags.add(new DocTag(name, value));
-        }
-        return tags;
-    }
-
-    private String getTagValue(PsiDocTag tag) {
-        StringBuilder sb = new StringBuilder();
-        for (PsiElement element : tag.getDataElements()) {
-            sb.append(element.getText());
-        }
-        return sb.toString().trim();
-    }
-
-    private String buildMethodSignature(PsiMethod method) {
-        StringBuilder sb = new StringBuilder();
-
-        // Return type
-        if (!method.isConstructor()) {
-            PsiType returnType = method.getReturnType();
-            sb.append(returnType != null ? returnType.getPresentableText() : "void");
-            sb.append(" ");
-        }
-
-        // Method name and parameters
-        sb.append(method.getName()).append("(");
-        PsiParameter[] params = method.getParameterList().getParameters();
-        for (int i = 0; i < params.length; i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(params[i].getType().getPresentableText());
-            sb.append(" ").append(params[i].getName());
-        }
-        sb.append(")");
-
-        return sb.toString();
+        return text.strip();
     }
 
     private String getFilePath(PsiElement element) {
@@ -358,14 +257,8 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
             String name,
             String qualifiedName,
             String symbolType,
-            String description,
-            List<DocTag> tags,
+            String documentation,
             String filePath,
             LineRange lineRange
-    ) {}
-
-    public record DocTag(
-            String name,
-            String value
     ) {}
 }
