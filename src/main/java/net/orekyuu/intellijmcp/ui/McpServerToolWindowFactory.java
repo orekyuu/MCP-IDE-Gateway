@@ -2,6 +2,7 @@ package net.orekyuu.intellijmcp.ui;
 
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
@@ -23,5 +24,15 @@ public class McpServerToolWindowFactory implements ToolWindowFactory, DumbAware 
                 false
         );
         toolWindow.getContentManager().addContent(logContent);
+
+        // Create Inline Comments tab
+        InlineCommentsPanel commentsPanel = new InlineCommentsPanel(project);
+        Content commentsContent = ContentFactory.getInstance().createContent(
+                commentsPanel.getComponent(),
+                "Inline Comments",
+                false
+        );
+        Disposer.register(commentsContent, commentsPanel);
+        toolWindow.getContentManager().addContent(commentsContent);
     }
 }

@@ -40,6 +40,11 @@ dependencies {
     implementation("org.eclipse.jetty:jetty-server:11.0.24")
     implementation("org.eclipse.jetty:jetty-servlet:11.0.24")
 
+    // Markdown rendering
+    implementation("org.commonmark:commonmark:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
+    implementation("org.commonmark:commonmark-ext-autolink:0.24.0")
+
     // テスト
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

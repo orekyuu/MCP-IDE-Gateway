@@ -34,6 +34,12 @@
                     anchor="bottom"
                     factoryClass="net.orekyuu.intellijmcp.ui.McpServerToolWindowFactory"
                     icon="AllIcons.Actions.Execute"/>
+        <projectService
+            serviceImplementation="net.orekyuu.intellijmcp.comment.InlineCommentService"/>
+        <projectService
+            serviceImplementation="net.orekyuu.intellijmcp.comment.InlineCommentEditorListener"/>
+        <postStartupActivity
+            implementation="net.orekyuu.intellijmcp.comment.InlineCommentStartupActivity"/>
     </extensions>
 
     <applicationListeners>

@@ -41,6 +41,7 @@ public class McpToolRegistry {
         registry.register(new SearchTextTool());
         registry.register(new FindFileTool());
         registry.register(new GetSourceCodeTool());
+        registry.register(new AddInlineCommentTool());
         return registry;
     }
 
