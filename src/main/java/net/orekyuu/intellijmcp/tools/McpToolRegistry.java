@@ -43,6 +43,7 @@ public class McpToolRegistry {
         registry.register(new GetSourceCodeTool());
         registry.register(new ReadFileTool());
         registry.register(new AddInlineCommentTool());
+        registry.register(new GetProjectInfoTool());
         return registry;
     }
 
