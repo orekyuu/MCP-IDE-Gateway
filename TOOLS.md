@@ -641,6 +641,7 @@ Run IntelliJ code inspections on a file or the entire project to find potential 
 | `weakWarnings` | `integer` | Weak warning count |
 | `infos` | `integer` | Info count |
 | `timedOut` | `boolean` | Whether inspection timed out |
+| `truncated` | `boolean` | Whether results were truncated due to `maxProblems` limit |
 | `files` | `FileProblems[]` | Problems grouped by file |
 
 `FileProblems`:

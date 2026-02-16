@@ -166,7 +166,8 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             }
 
             // Limit results
-            List<InspectionProblem> resultProblems = problems.size() > maxProblems
+            boolean truncated = problems.size() > maxProblems;
+            List<InspectionProblem> resultProblems = truncated
                     ? new ArrayList<>(problems.subList(0, maxProblems))
                     : new ArrayList<>(problems);
 
@@ -226,6 +227,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     weakWarnings,
                     infos,
                     timedOut[0],
+                    truncated,
                     groupedProblems
             ));
 
@@ -481,6 +483,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             int weakWarnings,
             int infos,
             boolean timedOut,
+            boolean truncated,
             List<FileProblems> files
     ) {}
 
