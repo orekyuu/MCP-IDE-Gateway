@@ -1,5 +1,6 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.openapi.vfs.LocalFileSystem;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import net.orekyuu.intellijmcp.services.McpServerLogService;
@@ -71,6 +72,9 @@ public interface McpTool<RESPONSE> {
                     // Log request
                     logService.info("Tool call: " + toolName);
                     logService.info("  Request: " + ResponseSerializer.serialize(arguments));
+
+                    // Refresh VFS to pick up external file changes
+                    LocalFileSystem.getInstance().refresh(false);
 
                     Result<ErrorResponse, RESPONSE> result = execute(arguments);
 
