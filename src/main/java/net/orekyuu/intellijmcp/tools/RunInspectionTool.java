@@ -7,8 +7,8 @@ import org.jetbrains.annotations.NotNull;
 import com.intellij.codeInspection.ex.*;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.progress.EmptyProgressIndicator;
-import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.*;
+import com.intellij.openapi.progress.util.ProgressIndicatorBase;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -18,6 +18,10 @@ import com.intellij.psi.*;
 import io.modelcontextprotocol.spec.McpSchema;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -112,45 +116,53 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             final List<InspectionProblem> problems = Collections.synchronizedList(new ArrayList<>());
             boolean[] timedOut = {false};
 
-            PsiFile targetFile = targetFileRef.get();
-            if (targetFile != null) {
-                // Inspect single file
-                collectProblemsFromFile(project, profile, targetFile, inspectionNames, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
-            } else {
-                // Inspect project - collect files first, then process
-                List<VirtualFile> filesToInspect = ReadAction.compute(() -> {
-                    List<VirtualFile> files = new ArrayList<>();
-                    ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
-                    fileIndex.iterateContent(file -> {
-                        if (!file.isDirectory() && fileIndex.isInSourceContent(file)) {
-                            files.add(file);
-                        }
-                        return true;
+            // Create a cancellable progress indicator for timeout support
+            ProgressIndicatorBase indicator = new ProgressIndicatorBase();
+            long remainingMillis = timeoutMillis - (System.currentTimeMillis() - startTime);
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+            ScheduledFuture<?> timeoutFuture = scheduler.schedule(() -> {
+                timedOut[0] = true;
+                indicator.cancel();
+                LOG.info("Inspection timed out after " + timeoutSeconds + " seconds");
+            }, Math.max(remainingMillis, 0), TimeUnit.MILLISECONDS);
+
+            try {
+                PsiFile targetFile = targetFileRef.get();
+                if (targetFile != null) {
+                    // Inspect single file
+                    collectProblemsFromFile(project, profile, targetFile, inspectionNames, minSeverityLevel, maxProblems, problems, indicator, timedOut);
+                } else {
+                    // Inspect project - collect files first, then process
+                    List<VirtualFile> filesToInspect = ReadAction.compute(() -> {
+                        List<VirtualFile> files = new ArrayList<>();
+                        ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+                        fileIndex.iterateContent(file -> {
+                            if (!file.isDirectory() && fileIndex.isInSourceContent(file)) {
+                                files.add(file);
+                            }
+                            return true;
+                        });
+                        return files;
                     });
-                    return files;
-                });
 
-                // Process each file with separate read actions
-                PsiManager psiManager = PsiManager.getInstance(project);
-                for (VirtualFile file : filesToInspect) {
-                    if (problems.size() >= maxProblems) break;
+                    // Process each file with separate read actions
+                    PsiManager psiManager = PsiManager.getInstance(project);
+                    for (VirtualFile file : filesToInspect) {
+                        if (problems.size() >= maxProblems) break;
+                        if (timedOut[0]) break;
 
-                    // Check timeout
-                    if (System.currentTimeMillis() - startTime > timeoutMillis) {
-                        timedOut[0] = true;
-                        LOG.info("Inspection timed out after " + timeoutSeconds + " seconds");
-                        break;
-                    }
-
-                    // Allow cancellation between files
-                    ProgressManager.checkCanceled();
-
-                    // Get PsiFile in a small read action
-                    PsiFile psiFile = ReadAction.compute(() -> psiManager.findFile(file));
-                    if (psiFile != null) {
-                        collectProblemsFromFile(project, profile, psiFile, inspectionNames, minSeverityLevel, maxProblems, problems, startTime, timeoutMillis, timedOut);
+                        // Get PsiFile in a small read action
+                        PsiFile psiFile = ReadAction.compute(() -> psiManager.findFile(file));
+                        if (psiFile != null) {
+                            collectProblemsFromFile(project, profile, psiFile, inspectionNames, minSeverityLevel, maxProblems, problems, indicator, timedOut);
+                        }
                     }
                 }
+            } catch (ProcessCanceledException e) {
+                timedOut[0] = true;
+            } finally {
+                timeoutFuture.cancel(false);
+                scheduler.shutdown();
             }
 
             // Limit results
@@ -227,7 +239,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                                          PsiFile psiFile, List<String> inspectionNames,
                                          int minSeverityLevel, int maxProblems,
                                          List<InspectionProblem> problems,
-                                         long startTime, long timeoutMillis, boolean[] timedOut) {
+                                         ProgressIndicator indicator, boolean[] timedOut) {
         if (problems.size() >= maxProblems) return;
         if (timedOut[0]) return;
 
@@ -270,20 +282,16 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             }
         });
 
-        // Check timeout before running inspections
-        if (System.currentTimeMillis() - startTime > timeoutMillis) {
-            timedOut[0] = true;
-            return;
-        }
+        if (timedOut[0]) return;
 
         // Run local inspections (uses read action internally)
         if (!localTools.isEmpty() && !timedOut[0]) {
-            runLocalInspections(localTools, psiFile, toolSeverityMap, maxProblems, problems, startTime, timeoutMillis, timedOut);
+            runLocalInspections(localTools, psiFile, toolSeverityMap, maxProblems, problems, indicator, timedOut);
         }
 
         // Run global simple inspections
         if (!globalSimpleTools.isEmpty() && !timedOut[0]) {
-            runGlobalSimpleInspections(project, globalSimpleTools, psiFile, toolSeverityMap, maxProblems, problems, startTime, timeoutMillis, timedOut);
+            runGlobalSimpleInspections(project, globalSimpleTools, psiFile, toolSeverityMap, maxProblems, problems, indicator, timedOut);
         }
     }
 
@@ -291,30 +299,22 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                                      PsiFile psiFile,
                                      Map<String, String> toolSeverityMap, int maxProblems,
                                      List<InspectionProblem> problems,
-                                     long startTime, long timeoutMillis, boolean[] timedOut) {
+                                     ProgressIndicator indicator, boolean[] timedOut) {
         try {
-            // Check timeout
-            if (System.currentTimeMillis() - startTime > timeoutMillis) {
-                timedOut[0] = true;
-                return;
-            }
+            if (timedOut[0]) return;
 
-            // InspectionEngine.inspectEx handles read action internally
-            Map<LocalInspectionToolWrapper, List<ProblemDescriptor>> results = ReadAction.compute(() ->
-                    InspectionEngine.inspectEx(toolWrappers, psiFile, psiFile.getTextRange(),
-                            psiFile.getTextRange(), false, false, true,
-                            new EmptyProgressIndicator(), (wrapper, descriptor) -> true)
-            );
+            // Run inspectEx with the cancellable indicator so timeout can interrupt it
+            Map<LocalInspectionToolWrapper, List<ProblemDescriptor>> results =
+                    ProgressManager.getInstance().runProcess(() ->
+                            ReadAction.compute(() ->
+                                    InspectionEngine.inspectEx(toolWrappers, psiFile, psiFile.getTextRange(),
+                                            psiFile.getTextRange(), false, false, true,
+                                            indicator, (wrapper, descriptor) -> true)
+                            ), indicator);
 
             // Process results outside of read action where possible
             for (var entry : results.entrySet()) {
                 if (problems.size() >= maxProblems || timedOut[0]) break;
-
-                // Check timeout periodically
-                if (System.currentTimeMillis() - startTime > timeoutMillis) {
-                    timedOut[0] = true;
-                    break;
-                }
 
                 LocalInspectionToolWrapper toolWrapper = entry.getKey();
                 String severity = toolSeverityMap.get(toolWrapper.getID());
@@ -330,6 +330,8 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                     }
                 }
             }
+        } catch (ProcessCanceledException e) {
+            timedOut[0] = true;
         } catch (Exception e) {
             LOG.debug("Local inspection failed for file " + psiFile.getName() + ": " + e.getMessage());
         }
@@ -340,30 +342,25 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                                             PsiFile psiFile,
                                             Map<String, String> toolSeverityMap, int maxProblems,
                                             List<InspectionProblem> problems,
-                                            long startTime, long timeoutMillis, boolean[] timedOut) {
+                                            ProgressIndicator indicator, boolean[] timedOut) {
         InspectionManager inspectionManager = InspectionManager.getInstance(project);
 
         for (GlobalInspectionToolWrapper toolWrapper : toolWrappers) {
             if (problems.size() >= maxProblems || timedOut[0]) break;
-
-            // Check timeout
-            if (System.currentTimeMillis() - startTime > timeoutMillis) {
-                timedOut[0] = true;
-                break;
-            }
 
             try {
                 GlobalInspectionTool tool = toolWrapper.getTool();
                 String severity = toolSeverityMap.get(toolWrapper.getID());
                 if (severity == null) continue;
 
-                // Run checkFile in read action
-                List<ProblemDescriptor> descriptors = ReadAction.compute(() -> {
-                    ProblemsHolder holder = new ProblemsHolder(inspectionManager, psiFile, false);
-                    ProblemDescriptionsProcessor processor = new SimpleProblemDescriptionsProcessor();
-                    tool.checkFile(psiFile, inspectionManager, holder, createSimpleGlobalContext(project), processor);
-                    return holder.getResults();
-                });
+                // Run checkFile with the cancellable indicator
+                List<ProblemDescriptor> descriptors = ProgressManager.getInstance().runProcess(() ->
+                        ReadAction.compute(() -> {
+                            ProblemsHolder holder = new ProblemsHolder(inspectionManager, psiFile, false);
+                            ProblemDescriptionsProcessor processor = new SimpleProblemDescriptionsProcessor();
+                            tool.checkFile(psiFile, inspectionManager, holder, createSimpleGlobalContext(project), processor);
+                            return holder.getResults();
+                        }), indicator);
 
                 // Process results
                 for (ProblemDescriptor descriptor : descriptors) {
@@ -374,6 +371,9 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                         problems.add(problem);
                     }
                 }
+            } catch (ProcessCanceledException e) {
+                timedOut[0] = true;
+                break;
             } catch (Exception e) {
                 LOG.debug("Global simple inspection failed for " + toolWrapper.getDisplayName() + ": " + e.getMessage());
             }
