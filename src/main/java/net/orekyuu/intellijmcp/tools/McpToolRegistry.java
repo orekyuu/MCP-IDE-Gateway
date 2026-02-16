@@ -44,6 +44,8 @@ public class McpToolRegistry {
         registry.register(new ReadFileTool());
         registry.register(new AddInlineCommentTool());
         registry.register(new GetProjectInfoTool());
+        registry.register(new CreateFileOrDirectoryTool());
+        registry.register(new DeleteFileOrDirectoryTool());
         return registry;
     }
 
