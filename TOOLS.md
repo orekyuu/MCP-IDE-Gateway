@@ -760,3 +760,54 @@ Add an inline comment to a file in the IDE editor. Supports Markdown formatting.
 | `line` | `integer` | Line number where comment was added (1-based) |
 | `comment` | `string` | The comment text |
 | `message` | `string` | Success message |
+
+---
+
+## File System
+
+### create_file_or_directory
+
+Create a file or directory in the project. Paths are relative to the project root to prevent access outside the project.
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `projectPath` | Yes | Absolute path to the project root directory |
+| `path` | Yes | Relative path from the project root (e.g., `src/main/java/Foo.java`) |
+| `isDirectory` | Yes | `true` to create a directory, `false` to create a file |
+| `content` | No | Initial content for the file (ignored for directories) |
+| `createParents` | No | Whether to create parent directories if they don't exist (default: `true`) |
+| `overwrite` | No | Whether to overwrite the file if it already exists (default: `false`, ignored for directories) |
+
+**Response:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | `string` | Relative path of the created file/directory |
+| `isDirectory` | `boolean` | Whether a directory was created |
+| `success` | `boolean` | Whether creation succeeded |
+| `message` | `string` | Success message |
+
+---
+
+### delete_file_or_directory
+
+Delete a file or directory in the project. Paths are relative to the project root to prevent access outside the project.
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `projectPath` | Yes | Absolute path to the project root directory |
+| `path` | Yes | Relative path from the project root |
+| `recursive` | No | Whether to recursively delete directory contents (default: `false`) |
+
+**Response:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | `string` | Relative path of the deleted file/directory |
+| `isDirectory` | `boolean` | Whether a directory was deleted |
+| `success` | `boolean` | Whether deletion succeeded |
+| `message` | `string` | Success message |
