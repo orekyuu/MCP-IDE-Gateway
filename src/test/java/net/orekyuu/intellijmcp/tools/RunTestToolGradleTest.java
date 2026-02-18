@@ -1,24 +1,33 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.execution.actions.ConfigurationContext;
+import com.intellij.execution.actions.ConfigurationFromContext;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.externalSystem.model.ProjectSystemId;
 import com.intellij.openapi.externalSystem.settings.ExternalProjectSettings;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.platform.externalSystem.testFramework.ExternalSystemImportingTestCase;
-import io.modelcontextprotocol.spec.McpSchema;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
+import org.jetbrains.plugins.gradle.execution.test.runner.GradleTestRunConfigurationProducer;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
+import org.jetbrains.plugins.gradle.util.TasksToRun;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
 public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
 
-    private RunTestTool tool;
-
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        tool = new RunTestTool();
     }
 
     @Override
@@ -43,86 +52,145 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
         return GradleConstants.SYSTEM_ID;
     }
 
+    @Override
+    protected void setUpInWriteAction() throws Exception {
+        Path projectRootPath = Path.of(myProject.getBasePath()).resolve("project");
+        Files.createDirectories(projectRootPath);
+        myProjectRoot = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(projectRootPath);
+    }
+
+    private static final String SIMPLE_BUILD_GRADLE = """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                testImplementation 'junit:junit:4.13.2'
+            }
+            """;
+
+    private static final String MULTI_TASK_BUILD_GRADLE = """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                testImplementation 'junit:junit:4.13.2'
+            }
+
+            tasks.create('integrationTest', Test) {
+                testClassesDirs = sourceSets.test.output.classesDirs
+                classpath = sourceSets.test.runtimeClasspath
+            }
+            """;
+
+    private static final String TEST_CLASS_CONTENT = """
+            package com.example;
+            import org.junit.Test;
+            public class MyTest {
+                @Test
+                public void testHello() {
+                    System.out.println("hello");
+                }
+            }
+            """;
+
+    private List<ConfigurationFromContext> getConfigurationsForFile(String relativeFilePath) {
+        String projectPath = myProject.getBasePath();
+        Path resolved = Path.of(projectPath).resolve(relativeFilePath);
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).as("VirtualFile for " + relativeFilePath).isNotNull();
+
+        return ReadAction.compute(() -> {
+            PsiFile psiFile = PsiManager.getInstance(myProject).findFile(vf);
+            assertThat(psiFile).as("PsiFile for " + relativeFilePath).isNotNull();
+            ConfigurationContext context = new ConfigurationContext(psiFile);
+            return context.getConfigurationsFromContext();
+        });
+    }
+
     public void testFindGradleRunConfigurationForTestFile() throws Exception {
-        createProjectConfig("""
-                plugins {
-                    id 'java'
-                }
-                repositories {
-                    mavenCentral()
-                }
-                dependencies {
-                    testImplementation 'junit:junit:4.13.2'
-                }
-                """);
-
-        createProjectSubFile("src/test/java/com/example/MyTest.java", """
-                package com.example;
-                import org.junit.Test;
-                public class MyTest {
-                    @Test
-                    public void testHello() {
-                        System.out.println("hello");
-                    }
-                }
-                """);
-
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
         importProject();
 
-        String projectPath = myProject.getBasePath();
+        var configs = getConfigurationsForFile("project/src/test/java/com/example/MyTest.java");
 
-        var result = tool.execute(Map.of(
-                "projectPath", projectPath,
-                "filePath", "project/src/test/java/com/example/MyTest.java"
-        ));
-
-        assertThat(result).isNotNull();
-        // Gradle run configuration should be found (not an error about "No run configuration found")
-        if (result instanceof McpTool.Result.ErrorResponse<?, ?> errorResult) {
-            assertThat(((ErrorResponse) errorResult.message()).message())
-                    .doesNotContain("No run configuration found");
-        }
+        assertThat(configs).isNotNull().isNotEmpty();
+        assertThat(configs).anyMatch(c -> c.getConfigurationSettings().getType().getDisplayName().equals("Gradle"));
     }
 
     public void testFindGradleRunConfigurationForTestMethod() throws Exception {
-        createProjectConfig("""
-                plugins {
-                    id 'java'
-                }
-                repositories {
-                    mavenCentral()
-                }
-                dependencies {
-                    testImplementation 'junit:junit:4.13.2'
-                }
-                """);
-
-        createProjectSubFile("src/test/java/com/example/MyTest.java", """
-                package com.example;
-                import org.junit.Test;
-                public class MyTest {
-                    @Test
-                    public void testHello() {
-                        System.out.println("hello");
-                    }
-                }
-                """);
-
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
         importProject();
 
         String projectPath = myProject.getBasePath();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
 
-        var result = tool.execute(Map.of(
-                "projectPath", projectPath,
-                "filePath", "project/src/test/java/com/example/MyTest.java",
-                "methodName", "testHello"
-        ));
+        var configs = ReadAction.compute(() -> {
+            PsiFile psiFile = PsiManager.getInstance(myProject).findFile(vf);
+            assertThat(psiFile).isNotNull();
+            var namedElements = com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(psiFile, com.intellij.psi.PsiNamedElement.class);
+            for (var element : namedElements) {
+                if ("testHello".equals(element.getName())) {
+                    ConfigurationContext context = new ConfigurationContext(element);
+                    var result = context.getConfigurationsFromContext();
+                    if (result != null && !result.isEmpty()) {
+                        return result;
+                    }
+                }
+            }
+            return List.<ConfigurationFromContext>of();
+        });
 
-        assertThat(result).isNotNull();
-        // Gradle run configuration should be found (not an error about "No run configuration found")
-        if (result instanceof McpTool.Result.ErrorResponse<?, ?> errorResult) {
-            assertThat(((ErrorResponse) errorResult.message()).message())
-                    .doesNotContain("No run configuration found");
-        }
+        assertThat(configs).isNotEmpty();
+        assertThat(configs).anyMatch(c -> c.getConfigurationSettings().getType().getDisplayName().equals("Gradle"));
+    }
+
+    public void testMultipleGradleTestTasksDetected() throws Exception {
+        createProjectConfig(MULTI_TASK_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        // GradleTestRunConfigurationProducer.findAllTestsTaskToRun detects multiple tasks
+        Path resolved = Path.of(myProject.getBasePath()).resolve("project/src/test/java/com/example/MyTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
+
+        var testsToRun = GradleTestRunConfigurationProducer.findAllTestsTaskToRun(vf, myProject);
+        assertThat(testsToRun).hasSizeGreaterThan(1);
+
+        List<String> taskNames = testsToRun.stream()
+                .map(TasksToRun::getTestName)
+                .toList();
+        System.out.println("Detected test tasks: " + taskNames);
+        assertThat(taskNames).contains("test", "integrationTest");
+    }
+
+    public void testMultipleGradleTestTasksProducesSingleConfigurationPerProducer() throws Exception {
+        createProjectConfig(MULTI_TASK_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        // ConfigurationContext.getConfigurationsFromContext returns one config per producer,
+        // so even with multiple test tasks, only one Gradle configuration is produced
+        var configs = getConfigurationsForFile("project/src/test/java/com/example/MyTest.java");
+
+        assertThat(configs).isNotNull().isNotEmpty();
+
+        long gradleConfigCount = configs.stream()
+                .filter(c -> c.getConfigurationSettings().getType().getDisplayName().equals("Gradle"))
+                .count();
+
+        // IntelliJ's ConfigurationContext produces one configuration per producer type,
+        // so we get exactly 1 Gradle config even with multiple test tasks
+        assertThat(gradleConfigCount).isEqualTo(1);
     }
 }

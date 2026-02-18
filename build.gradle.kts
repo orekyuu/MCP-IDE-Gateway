@@ -23,6 +23,8 @@ dependencies {
         instrumentationTools()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
         testBundledPlugin("com.intellij.gradle")
+        testBundledPlugin("org.jetbrains.plugins.gradle")
+        testBundledPlugin("JUnit")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Plugin.ExternalSystem)
     }
 
