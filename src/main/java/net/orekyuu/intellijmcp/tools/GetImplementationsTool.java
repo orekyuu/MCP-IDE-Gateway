@@ -91,6 +91,8 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
 
             return successResult(new GetImplementationsResponse(targetInfo, implementations));
 
+        } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
+            throw e;
         } catch (Exception e) {
             LOG.error("Error in get_implementations tool", e);
             return errorResult("Error: " + e.getMessage());

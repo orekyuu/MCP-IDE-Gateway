@@ -71,7 +71,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
             // Resolve element
             final int finalDepth = depth;
             PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
-                    PsiElementResolver.resolve(project, className, Optional.of(memberName)));
+                    PsiElementResolver.resolve(project, className, memberName));
 
             return switch (resolveResult) {
                 case PsiElementResolver.ResolveResult.ClassNotFound r ->
@@ -164,6 +164,8 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
 
                 callers.add(callerInfo);
             }
+        } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
+            throw e;
         } catch (Exception e) {
             LOG.warn("Error finding callers for method: " + method.getName(), e);
         }

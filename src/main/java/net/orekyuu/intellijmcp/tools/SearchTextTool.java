@@ -170,7 +170,7 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
                 }
 
                 // Search in file
-                searchInFile(project, findManager, findModel, file, matches, maxResults);
+                searchInFile(findManager, findModel, file, matches, maxResults);
                 return true;
             }
         });
@@ -179,7 +179,6 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
     }
 
     private void searchInFile(
-            Project project,
             FindManager findManager,
             FindModel findModel,
             VirtualFile file,

@@ -13,15 +13,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import org.jetbrains.plugins.gradle.execution.test.runner.GradleTestRunConfigurationProducer;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
-import org.jetbrains.plugins.gradle.util.TasksToRun;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
+import org.jetbrains.plugins.gradle.util.TasksToRun;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
 
@@ -54,7 +53,9 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
 
     @Override
     protected void setUpInWriteAction() throws Exception {
-        Path projectRootPath = Path.of(myProject.getBasePath()).resolve("project");
+        String basePath = myProject.getBasePath();
+        assertThat(basePath).as("Project base path").isNotNull();
+        Path projectRootPath = Path.of(basePath).resolve("project");
         Files.createDirectories(projectRootPath);
         myProjectRoot = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(projectRootPath);
     }
@@ -99,15 +100,16 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
             }
             """;
 
-    private List<ConfigurationFromContext> getConfigurationsForFile(String relativeFilePath) {
+    private List<ConfigurationFromContext> getConfigurationsForFile() {
         String projectPath = myProject.getBasePath();
-        Path resolved = Path.of(projectPath).resolve(relativeFilePath);
+        assertThat(projectPath).as("Project base path").isNotNull();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
         VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
-        assertThat(vf).as("VirtualFile for " + relativeFilePath).isNotNull();
+        assertThat(vf).as("VirtualFile for test file").isNotNull();
 
         return ReadAction.compute(() -> {
             PsiFile psiFile = PsiManager.getInstance(myProject).findFile(vf);
-            assertThat(psiFile).as("PsiFile for " + relativeFilePath).isNotNull();
+            assertThat(psiFile).as("PsiFile for test file").isNotNull();
             ConfigurationContext context = new ConfigurationContext(psiFile);
             return context.getConfigurationsFromContext();
         });
@@ -118,7 +120,7 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
         createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
         importProject();
 
-        var configs = getConfigurationsForFile("project/src/test/java/com/example/MyTest.java");
+        var configs = getConfigurationsForFile();
 
         assertThat(configs).isNotNull().isNotEmpty();
         assertThat(configs).anyMatch(c -> c.getConfigurationSettings().getType().getDisplayName().equals("Gradle"));
@@ -130,6 +132,7 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
         importProject();
 
         String projectPath = myProject.getBasePath();
+        assertThat(projectPath).as("Project base path").isNotNull();
         Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
         VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
         assertThat(vf).isNotNull();
@@ -160,7 +163,9 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
         importProject();
 
         // GradleTestRunConfigurationProducer.findAllTestsTaskToRun detects multiple tasks
-        Path resolved = Path.of(myProject.getBasePath()).resolve("project/src/test/java/com/example/MyTest.java");
+        String basePath = myProject.getBasePath();
+        assertThat(basePath).as("Project base path").isNotNull();
+        Path resolved = Path.of(basePath).resolve("project/src/test/java/com/example/MyTest.java");
         VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
         assertThat(vf).isNotNull();
 
@@ -181,7 +186,7 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
 
         // ConfigurationContext.getConfigurationsFromContext returns one config per producer,
         // so even with multiple test tasks, only one Gradle configuration is produced
-        var configs = getConfigurationsForFile("project/src/test/java/com/example/MyTest.java");
+        var configs = getConfigurationsForFile();
 
         assertThat(configs).isNotNull().isNotEmpty();
 

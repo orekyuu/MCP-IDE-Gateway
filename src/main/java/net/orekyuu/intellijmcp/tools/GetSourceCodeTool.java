@@ -60,7 +60,7 @@ public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSour
                 Project project = projectOpt.get();
 
                 // Resolve element using PsiElementResolver
-                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName);
+                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
 
                 return switch (resolveResult) {
                     case PsiElementResolver.ResolveResult.ClassNotFound r ->

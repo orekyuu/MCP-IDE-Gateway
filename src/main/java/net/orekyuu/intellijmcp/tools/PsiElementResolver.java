@@ -4,8 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.PsiShortNamesCache;
-
-import java.util.Optional;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Utility for resolving PsiElements from className + memberName.
@@ -25,10 +24,10 @@ public final class PsiElementResolver {
      *
      * @param project   the IntelliJ project
      * @param className fully qualified class name
-     * @param memberName optional member name (method, field, or inner class)
+     * @param memberName member name (method, field, or inner class), or null for class only
      * @return the resolve result
      */
-    public static ResolveResult resolve(Project project, String className, Optional<String> memberName) {
+    public static ResolveResult resolve(Project project, String className, @Nullable String memberName) {
         GlobalSearchScope scope = GlobalSearchScope.allScope(project);
         PsiClass psiClass = findClass(project, className, scope);
 
@@ -36,31 +35,30 @@ public final class PsiElementResolver {
             return new ResolveResult.ClassNotFound(className);
         }
 
-        if (memberName.isEmpty()) {
+        if (memberName == null || memberName.isEmpty()) {
             return new ResolveResult.Success(psiClass, getClassKind(psiClass), psiClass.getName());
         }
 
-        String member = memberName.get();
-
+        
         // Try to find method first
-        PsiMethod[] methods = psiClass.findMethodsByName(member, false);
+        PsiMethod[] methods = psiClass.findMethodsByName(memberName, false);
         if (methods.length > 0) {
-            return new ResolveResult.Success(methods[0], methods[0].isConstructor() ? "constructor" : "method", member);
+            return new ResolveResult.Success(methods[0], methods[0].isConstructor() ? "constructor" : "method", memberName);
         }
 
         // Try to find field
-        PsiField field = psiClass.findFieldByName(member, false);
+        PsiField field = psiClass.findFieldByName(memberName, false);
         if (field != null) {
-            return new ResolveResult.Success(field, "field", member);
+            return new ResolveResult.Success(field, "field", memberName);
         }
 
         // Try to find inner class
-        PsiClass innerClass = psiClass.findInnerClassByName(member, false);
+        PsiClass innerClass = psiClass.findInnerClassByName(memberName, false);
         if (innerClass != null) {
-            return new ResolveResult.Success(innerClass, getClassKind(innerClass), member);
+            return new ResolveResult.Success(innerClass, getClassKind(innerClass), memberName);
         }
 
-        return new ResolveResult.MemberNotFound(member, className);
+        return new ResolveResult.MemberNotFound(memberName, className);
     }
 
     /**

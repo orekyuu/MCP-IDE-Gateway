@@ -17,7 +17,7 @@ class ListProjectsToolTest extends BaseMcpToolTest<ListProjectsTool> {
     void executeReturnsProjects() {
         var result = tool.execute(Map.of());
 
-        var response = McpToolResultAssert.<ListProjectsTool.ListProjectsResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.projects()).isNotNull();
         assertThat(response.projects().size()).isGreaterThanOrEqualTo(1);

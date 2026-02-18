@@ -57,6 +57,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
     }
 
     @Override
+    @SuppressWarnings("resource") // ScheduledExecutorService is properly shutdown in finally block
     public Result<ErrorResponse, InspectionResponse> execute(Map<String, Object> arguments) {
         try {
             // Parse arguments (no read action needed)
@@ -160,6 +161,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 }
             } catch (ProcessCanceledException e) {
                 timedOut[0] = true;
+                throw e;
             } finally {
                 timeoutFuture.cancel(false);
                 scheduler.shutdown();
@@ -287,7 +289,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
         if (timedOut[0]) return;
 
         // Run local inspections (uses read action internally)
-        if (!localTools.isEmpty() && !timedOut[0]) {
+        if (!localTools.isEmpty()) {
             runLocalInspections(localTools, psiFile, toolSeverityMap, maxProblems, problems, indicator, timedOut);
         }
 
@@ -334,6 +336,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             }
         } catch (ProcessCanceledException e) {
             timedOut[0] = true;
+            throw e;
         } catch (Exception e) {
             LOG.debug("Local inspection failed for file " + psiFile.getName() + ": " + e.getMessage());
         }
@@ -375,7 +378,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
                 }
             } catch (ProcessCanceledException e) {
                 timedOut[0] = true;
-                break;
+                throw e;
             } catch (Exception e) {
                 LOG.debug("Global simple inspection failed for " + toolWrapper.getDisplayName() + ": " + e.getMessage());
             }
@@ -405,7 +408,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
             if (sharedLocal != null) {
                 String sharedAlternativeId = sharedLocal.getTool().getAlternativeID();
                 if (sharedAlternativeId != null) {
-                    return inspectionNames.stream().anyMatch(name -> sharedAlternativeId.equals(name));
+                    return inspectionNames.stream().anyMatch(sharedAlternativeId::equals);
                 }
             }
         }

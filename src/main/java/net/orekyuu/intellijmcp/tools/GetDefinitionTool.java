@@ -60,7 +60,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
                 Project project = projectOpt.get();
 
                 // Resolve element
-                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName);
+                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
 
                 return switch (resolveResult) {
                     case PsiElementResolver.ResolveResult.ClassNotFound r ->

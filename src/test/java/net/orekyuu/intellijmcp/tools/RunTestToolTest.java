@@ -9,8 +9,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.assertj.core.api.Assertions.*;
-
 class RunTestToolTest extends BaseMcpToolTest<RunTestTool> {
 
     @Override

@@ -63,7 +63,7 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
 
             // Resolve the target element
             PsiElement targetElement = runReadAction(() -> {
-                PsiElementResolver.ResolveResult result = PsiElementResolver.resolve(project, className, memberName);
+                PsiElementResolver.ResolveResult result = PsiElementResolver.resolve(project, className, memberName.orElse(null));
                 if (result instanceof PsiElementResolver.ResolveResult.Success s) {
                     return s.element();
                 }
@@ -71,13 +71,13 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
             });
 
             if (targetElement == null) {
-                PsiElementResolver.ResolveResult result = runReadAction(() -> PsiElementResolver.resolve(project, className, memberName));
+                PsiElementResolver.ResolveResult result = runReadAction(() -> PsiElementResolver.resolve(project, className, memberName.orElse(null)));
                 return switch (result) {
                     case PsiElementResolver.ResolveResult.ClassNotFound r ->
                             errorResult("Error: Class not found: " + r.className());
                     case PsiElementResolver.ResolveResult.MemberNotFound r ->
                             errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                    case PsiElementResolver.ResolveResult.Success s ->
+                    case PsiElementResolver.ResolveResult.Success ignored ->
                             errorResult("Error: Unexpected state");
                 };
             }
@@ -105,6 +105,8 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
 
             return successResult(new FindUsagesResponse(symbolInfo, usages));
 
+        } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
+            throw e;
         } catch (Exception e) {
             LOG.error("Error in find_usages tool", e);
             return errorResult("Error: " + e.getMessage());

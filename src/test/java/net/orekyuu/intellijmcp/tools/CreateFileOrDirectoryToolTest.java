@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.*;
-
 class CreateFileOrDirectoryToolTest extends BaseMcpToolTest<CreateFileOrDirectoryTool> {
 
     @Override

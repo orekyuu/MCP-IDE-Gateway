@@ -63,7 +63,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "projectPath", projectPath
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.searchText()).isEqualTo("searchableText");
         assertThat(response.useRegex()).isFalse();
@@ -89,7 +89,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "caseSensitive", true
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.caseSensitive()).isTrue();
         assertThat(response.matches())
@@ -114,7 +114,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "useRegex", true
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.useRegex()).isTrue();
         assertThat(response.totalMatches()).isGreaterThanOrEqualTo(3);
@@ -136,7 +136,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "filePattern", "*.java"
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.filePattern()).isEqualTo("*.java");
         assertThat(response.matches())
@@ -161,7 +161,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "maxResults", 10
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.totalMatches()).isEqualTo(10);
         assertThat(response.truncated()).isTrue();
@@ -183,7 +183,7 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
                 "projectPath", projectPath
         ));
 
-        var response = McpToolResultAssert.<SearchTextTool.SearchTextResponse>assertThat(result).getSuccessResponse();
+        var response = McpToolResultAssert.assertThat(result).getSuccessResponse();
 
         assertThat(response.matches()).hasSize(1);
         var match = response.matches().getFirst();

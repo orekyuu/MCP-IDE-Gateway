@@ -3,10 +3,13 @@ package net.orekyuu.intellijmcp.comment;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
-import com.intellij.openapi.editor.*;
+import com.intellij.openapi.editor.ComponentInlayKt;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.Inlay;
+import com.intellij.openapi.editor.InlayProperties;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
-import com.intellij.openapi.editor.ComponentInlayKt;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
@@ -36,7 +39,7 @@ public final class InlineCommentEditorListener implements Disposable {
             @Override
             public void editorCreated(@NotNull EditorFactoryEvent event) {
                 Editor editor = event.getEditor();
-                if (!isRelevantEditor(editor)) return;
+                if (isIrrelevantEditor(editor)) return;
 
                 String filePath = getFilePath(editor);
                 if (filePath == null) return;
@@ -52,7 +55,7 @@ public final class InlineCommentEditorListener implements Disposable {
             @Override
             public void editorReleased(@NotNull EditorFactoryEvent event) {
                 Editor editor = event.getEditor();
-                if (!isRelevantEditor(editor)) return;
+                if (isIrrelevantEditor(editor)) return;
 
                 String filePath = getFilePath(editor);
                 if (filePath == null) return;
@@ -76,7 +79,7 @@ public final class InlineCommentEditorListener implements Disposable {
                     public void onCommentAdded(InlineComment comment) {
                         ApplicationManager.getApplication().invokeLater(() -> {
                             for (Editor editor : EditorFactory.getInstance().getAllEditors()) {
-                                if (!isRelevantEditor(editor)) continue;
+                                if (isIrrelevantEditor(editor)) continue;
                                 String filePath = getFilePath(editor);
                                 if (comment.getFilePath().equals(filePath)) {
                                     addInlayForComment(editor, comment);
@@ -113,9 +116,9 @@ public final class InlineCommentEditorListener implements Disposable {
         return project.getService(InlineCommentEditorListener.class);
     }
 
-    private boolean isRelevantEditor(Editor editor) {
+    private boolean isIrrelevantEditor(Editor editor) {
         Project editorProject = editor.getProject();
-        return editorProject != null && editorProject.equals(project);
+        return editorProject == null || !editorProject.equals(project);
     }
 
     private String getFilePath(Editor editor) {
@@ -123,6 +126,7 @@ public final class InlineCommentEditorListener implements Disposable {
         return file != null ? file.getPath() : null;
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     private void addInlayForComment(Editor editor, InlineComment comment) {
         if (commentInlays.containsKey(comment.getId())) return;
 

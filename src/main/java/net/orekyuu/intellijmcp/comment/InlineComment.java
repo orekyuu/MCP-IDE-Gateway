@@ -1,6 +1,5 @@
 package net.orekyuu.intellijmcp.comment;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -12,14 +11,12 @@ public final class InlineComment {
     private final String filePath;
     private final int line;
     private final String comment;
-    private final LocalDateTime createdAt;
 
     public InlineComment(String filePath, int line, String comment) {
         this.id = UUID.randomUUID().toString();
         this.filePath = filePath;
         this.line = line;
         this.comment = comment;
-        this.createdAt = LocalDateTime.now();
     }
 
     public String getId() {
@@ -36,9 +33,5 @@ public final class InlineComment {
 
     public String getComment() {
         return comment;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

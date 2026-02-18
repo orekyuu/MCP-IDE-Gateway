@@ -66,7 +66,7 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
 
             // Resolve element
             PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
-                    PsiElementResolver.resolve(project, className, memberName));
+                    PsiElementResolver.resolve(project, className, memberName.orElse(null)));
 
             return switch (resolveResult) {
                 case PsiElementResolver.ResolveResult.ClassNotFound r ->

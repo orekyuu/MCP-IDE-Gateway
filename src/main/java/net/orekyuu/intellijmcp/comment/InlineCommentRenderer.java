@@ -75,7 +75,7 @@ public final class InlineCommentRenderer {
 
         JPanel outer = new JPanel(new BorderLayout());
         outer.setOpaque(false);
-        outer.setBorder(JBUI.Borders.empty(2, 0, 2, 0));
+        outer.setBorder(JBUI.Borders.empty(2, 0));
 
         JPanel card = new JPanel(new BorderLayout());
         card.setBackground(COMMENT_BG);
@@ -91,7 +91,7 @@ public final class InlineCommentRenderer {
         titleLabel.setForeground(HEADER_FG);
         header.add(titleLabel, BorderLayout.WEST);
 
-        JButton closeBtn = new JButton("\u00D7");
+        JButton closeBtn = new JButton("×");
         closeBtn.setFont(editorFont.deriveFont(Font.BOLD, (float) (fontSize + 2)));
         closeBtn.setBorderPainted(false);
         closeBtn.setContentAreaFilled(false);
@@ -111,7 +111,7 @@ public final class InlineCommentRenderer {
         JEditorPane body = createBodyPane(commentText, project);
         JPanel bodyWrapper = new JPanel(new BorderLayout());
         bodyWrapper.setBackground(COMMENT_BG);
-        bodyWrapper.setBorder(JBUI.Borders.empty(6, 8, 6, 8));
+        bodyWrapper.setBorder(JBUI.Borders.empty(6, 8));
         bodyWrapper.add(body, BorderLayout.CENTER);
 
         card.add(bodyWrapper, BorderLayout.CENTER);

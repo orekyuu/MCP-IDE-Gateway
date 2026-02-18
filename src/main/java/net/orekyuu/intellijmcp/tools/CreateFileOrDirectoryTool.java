@@ -105,7 +105,12 @@ public class CreateFileOrDirectoryTool extends AbstractMcpTool<CreateFileOrDirec
                                     }
                                 }
 
-                                VirtualFile parentDir = VfsUtil.findFile(resolved.getParent(), true);
+                                java.nio.file.Path resolvedParent = resolved.getParent();
+                                if (resolvedParent == null) {
+                                    future.complete(errorResult("Error: Cannot determine parent directory for: " + path));
+                                    return;
+                                }
+                                VirtualFile parentDir = VfsUtil.findFile(resolvedParent, true);
                                 if (parentDir == null) {
                                     future.complete(errorResult("Error: Parent directory not found for: " + path));
                                     return;

@@ -101,13 +101,13 @@ public class RunTestTool extends AbstractMcpTool<Object> {
 
             if (candidates.isEmpty()) {
                 return errorResult("Error: No run configuration found for this file" +
-                        (methodName.isPresent() ? " and method '" + methodName.get() + "'" : ""));
+                        methodName.map(m -> " and method '" + m + "'").orElse(""));
             }
 
             // Selection logic
             RunnerAndConfigurationSettings selectedConfig;
             if (candidates.size() == 1) {
-                selectedConfig = candidates.get(0);
+                selectedConfig = candidates.getFirst();
             } else if (configurationName.isEmpty()) {
                 // Return candidate list for selection
                 List<ConfigurationCandidate> candidateList = candidates.stream()
@@ -172,7 +172,7 @@ public class RunTestTool extends AbstractMcpTool<Object> {
                         .map(ConfigurationFromContext::getConfigurationSettings)
                         .toList();
             }
-            return List.<RunnerAndConfigurationSettings>of();
+            return List.of();
         });
     }
 

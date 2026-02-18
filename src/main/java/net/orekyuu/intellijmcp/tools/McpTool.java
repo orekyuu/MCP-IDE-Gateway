@@ -38,6 +38,7 @@ public interface McpTool<RESPONSE> {
      */
     Result<ErrorResponse, RESPONSE> execute(Map<String, Object> arguments);
 
+    @SuppressWarnings("unused") // L and R are used in subtype declarations
     sealed interface Result<L, R> {
       record ErrorResponse<L, R>(L message) implements Result<L, R> {}
       record SuccessResponse<L, R>(R message) implements Result<L, R> {}

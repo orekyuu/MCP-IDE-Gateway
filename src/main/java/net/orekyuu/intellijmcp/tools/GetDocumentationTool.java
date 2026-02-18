@@ -1,6 +1,6 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.intellij.codeInsight.documentation.DocumentationManager;
+import com.intellij.lang.LanguageDocumentation;
 import com.intellij.lang.documentation.DocumentationProvider;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
@@ -108,13 +108,13 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
 
         // Resolve using PsiElementResolver
         PsiElementResolver.ResolveResult result =
-                PsiElementResolver.resolve(project, className, Optional.ofNullable(memberName));
+                PsiElementResolver.resolve(project, className, memberName);
 
         return switch (result) {
             case PsiElementResolver.ResolveResult.Success s ->
                     buildDocumentation(s.element(), s.name(), getQualifiedName(s), s.kind());
-            case PsiElementResolver.ResolveResult.ClassNotFound cnf -> null;
-            case PsiElementResolver.ResolveResult.MemberNotFound mnf -> null;
+            case PsiElementResolver.ResolveResult.ClassNotFound ignored -> null;
+            case PsiElementResolver.ResolveResult.MemberNotFound ignored -> null;
         };
     }
 
@@ -137,7 +137,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
     }
 
     private String generateDocumentation(PsiElement element) {
-        DocumentationProvider provider = DocumentationManager.getProviderFromElement(element);
+        DocumentationProvider provider = LanguageDocumentation.INSTANCE.forLanguage(element.getLanguage());
         if (provider == null) {
             return null;
         }
