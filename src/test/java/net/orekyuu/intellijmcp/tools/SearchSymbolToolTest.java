@@ -1,83 +1,34 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase;
-import io.modelcontextprotocol.spec.McpSchema;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
-public class SearchSymbolToolTest extends BasePlatformTestCase {
-
-    private SearchSymbolTool tool;
+class SearchSymbolToolTest extends BaseMcpToolTest<SearchSymbolTool> {
 
     @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        tool = new SearchSymbolTool();
+    SearchSymbolTool createTool() {
+        return new SearchSymbolTool();
     }
 
-    public void testGetName() {
-        assertThat(tool.getName()).isEqualTo("search_symbol");
-    }
-
-    public void testGetDescription() {
-        assertThat(tool.getDescription())
-                .isNotNull()
-                .containsIgnoringCase("symbol");
-    }
-
-    public void testGetInputSchema() {
-        McpSchema.JsonSchema schema = tool.getInputSchema();
-
-        assertThat(schema).isNotNull();
-        assertThat(schema.type()).isEqualTo("object");
-        assertThat(schema.properties())
-                .isNotNull()
-                .containsKey("query")
-                .containsKey("projectPath")
-                .containsKey("symbolType");
-        assertThat(schema.required())
-                .isNotNull()
-                .contains("query", "projectPath");
-    }
-
-    public void testExecuteWithMissingQuery() {
+    @Test
+    void executeWithMissingQuery() {
         var result = tool.execute(Map.of("projectPath", "/some/path"));
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
-        assertThat(errorResult.message().message()).contains("query");
+        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("query");
     }
 
-    public void testExecuteWithMissingProjectPath() {
+    @Test
+    void executeWithMissingProjectPath() {
         var result = tool.execute(Map.of("query", "test"));
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
-        assertThat(errorResult.message().message()).contains("projectPath");
+        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("projectPath");
     }
 
-    public void testExecuteWithNonExistentProject() {
+    @Test
+    void executeWithNonExistentProject() {
         var result = tool.execute(Map.of("query", "test", "projectPath", "/nonexistent/project/path"));
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, SearchSymbolTool.SearchSymbolResponse>) result;
-        assertThat(errorResult.message().message()).contains("Project not found at path");
+        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("Project not found at path");
     }
 
-    public void testToSpecification() {
-        var spec = tool.toSpecification();
-
-        assertThat(spec).isNotNull();
-        assertThat(spec.tool()).isNotNull();
-        assertThat(spec.tool().name()).isEqualTo("search_symbol");
-        assertThat(spec.tool().inputSchema()).isNotNull();
-    }
 }

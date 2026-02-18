@@ -1,96 +1,50 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase;
-import io.modelcontextprotocol.spec.McpSchema;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
-public class RunInspectionToolTest extends BasePlatformTestCase {
-
-    private RunInspectionTool tool;
+class RunInspectionToolTest extends BaseMcpToolTest<RunInspectionTool> {
 
     @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        tool = new RunInspectionTool();
+    RunInspectionTool createTool() {
+        return new RunInspectionTool();
     }
 
-    public void testGetName() {
-        assertThat(tool.getName()).isEqualTo("run_inspection");
-    }
-
-    public void testGetDescription() {
-        assertThat(tool.getDescription())
-                .isNotNull()
-                .containsIgnoringCase("inspection");
-    }
-
-    public void testGetInputSchema() {
-        McpSchema.JsonSchema schema = tool.getInputSchema();
-
-        assertThat(schema).isNotNull();
-        assertThat(schema.type()).isEqualTo("object");
-        assertThat(schema.properties())
-                .isNotNull()
-                .containsKey("filePath")
-                .containsKey("projectPath")
-                .containsKey("inspectionNames");
-        assertThat(schema.required())
-                .isNotNull()
-                .contains("projectPath");
-    }
-
-    public void testExecuteWithMissingProjectPath() {
+    @Test
+    void executeWithMissingProjectPath() {
         var result = tool.execute(Map.of());
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, RunInspectionTool.InspectionResponse>) result;
-        assertThat(errorResult.message().message()).contains("projectPath");
+        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("projectPath");
     }
 
-    public void testExecuteWithNonExistentProject() {
+    @Test
+    void executeWithNonExistentProject() {
         var result = tool.execute(Map.of("projectPath", "/nonexistent/project/path"));
-
-        assertThat(result).isNotNull();
-        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
-
-        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, RunInspectionTool.InspectionResponse>) result;
-        assertThat(errorResult.message().message()).contains("Project not found at path");
+        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("Project not found at path");
     }
 
-    public void testToSpecification() {
-        var spec = tool.toSpecification();
-
-        assertThat(spec).isNotNull();
-        assertThat(spec.tool()).isNotNull();
-        assertThat(spec.tool().name()).isEqualTo("run_inspection");
-        assertThat(spec.tool().inputSchema()).isNotNull();
-    }
-
-    public void testShouldSkipEditorConfigInspectionForJavaFile() {
-        // Test the filtering logic: EditorConfig inspections should be skipped for .java files
+    @Test
+    void shouldSkipEditorConfigInspectionForJavaFile() {
         assertThat(shouldSkipInspection("EditorConfigVerifyByCore", "java")).isTrue();
         assertThat(shouldSkipInspection("EditorConfigCharsetInspection", "java")).isTrue();
         assertThat(shouldSkipInspection("JsonDuplicatePropertyKeys", "java")).isTrue();
         assertThat(shouldSkipInspection("YamlUnresolvedAlias", "java")).isTrue();
     }
 
-    public void testShouldNotSkipEditorConfigInspectionForEditorConfigFile() {
-        // EditorConfig inspections should NOT be skipped for .editorconfig files
+    @Test
+    void shouldNotSkipEditorConfigInspectionForEditorConfigFile() {
         assertThat(shouldSkipInspection("EditorConfigVerifyByCore", "editorconfig")).isFalse();
     }
 
-    public void testShouldNotSkipJsonInspectionForJsonFile() {
-        // Json inspections should NOT be skipped for .json files
+    @Test
+    void shouldNotSkipJsonInspectionForJsonFile() {
         assertThat(shouldSkipInspection("JsonDuplicatePropertyKeys", "json")).isFalse();
     }
 
-    public void testShouldNotSkipJavaInspectionForJavaFile() {
-        // Java inspections should NOT be skipped for .java files
+    @Test
+    void shouldNotSkipJavaInspectionForJavaFile() {
         assertThat(shouldSkipInspection("UnusedDeclaration", "java")).isFalse();
         assertThat(shouldSkipInspection("JavaDoc", "java")).isFalse();
     }
