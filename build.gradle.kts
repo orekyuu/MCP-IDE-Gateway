@@ -22,6 +22,8 @@ dependencies {
 
         instrumentationTools()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+        testBundledPlugin("com.intellij.gradle")
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Plugin.ExternalSystem)
     }
 
     // MCP SDK

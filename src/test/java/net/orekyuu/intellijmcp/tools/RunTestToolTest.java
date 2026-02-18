@@ -1,9 +1,14 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import io.modelcontextprotocol.spec.McpSchema;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -63,6 +68,95 @@ public class RunTestToolTest extends BasePlatformTestCase {
 
         var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
         assertThat(errorResult.message().message()).contains("filePath");
+    }
+
+    public void testExecuteWithNonExistentProject() {
+        var result = tool.execute(Map.of(
+                "projectPath", "/nonexistent/project/path",
+                "filePath", "src/test/Foo.java"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
+        assertThat(errorResult.message().message()).contains("Project not found at path");
+    }
+
+    public void testExecuteWithPathTraversal() {
+        var result = tool.execute(Map.of(
+                "projectPath", "/some/project",
+                "filePath", "../../etc/passwd"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
+        assertThat(errorResult.message().message()).contains("Path is outside the project directory");
+    }
+
+    public void testExecuteWithNonExistentFile() {
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
+
+        var result = tool.execute(Map.of(
+                "projectPath", projectPath,
+                "filePath", "src/test/java/NonExistent.java"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
+        assertThat(errorResult.message().message()).contains("File not found");
+    }
+
+    public void testExecuteWithNoRunConfiguration() throws IOException {
+        // BasePlatformTestCase doesn't have test runners, so no configuration should be found
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
+        Path filePath = Path.of(projectPath, "src", "PlainFile.java");
+        Files.createDirectories(filePath.getParent());
+        Files.writeString(filePath, """
+                public class PlainFile {
+                    public static void main(String[] args) {}
+                }
+                """);
+        LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath);
+
+        var result = tool.execute(Map.of(
+                "projectPath", projectPath,
+                "filePath", "src/PlainFile.java"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
+        assertThat(errorResult.message().message()).contains("No run configuration found");
+    }
+
+    public void testExecuteWithMethodNameAndNoRunConfiguration() throws IOException {
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
+        Path filePath = Path.of(projectPath, "src", "SomeTest.java");
+        Files.createDirectories(filePath.getParent());
+        Files.writeString(filePath, """
+                public class SomeTest {
+                    public void testSomething() {}
+                }
+                """);
+        LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath);
+
+        var result = tool.execute(Map.of(
+                "projectPath", projectPath,
+                "filePath", "src/SomeTest.java",
+                "methodName", "testSomething"
+        ));
+
+        assertThat(result).isNotNull();
+        assertThat(result).isInstanceOf(McpTool.Result.ErrorResponse.class);
+
+        var errorResult = (McpTool.Result.ErrorResponse<ErrorResponse, Object>) result;
+        assertThat(errorResult.message().message()).contains("No run configuration found");
     }
 
     public void testToSpecification() {
