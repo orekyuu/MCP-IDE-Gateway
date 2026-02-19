@@ -47,6 +47,7 @@ public class McpToolRegistry {
         registry.register(new CreateFileOrDirectoryTool());
         registry.register(new DeleteFileOrDirectoryTool());
         registry.register(new RunTestTool());
+        registry.register(new ListTestConfigurationsTool());
         return registry;
     }
 

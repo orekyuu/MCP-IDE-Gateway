@@ -36,8 +36,8 @@ public class RunTestTool extends AbstractMcpTool<Object> {
 
     private static final Arg<ProjectRelativePath> FILE_PATH =
             Arg.projectRelativePath("filePath", "Relative path to the test file from the project root");
-    private static final Arg<Optional<String>> METHOD_NAME =
-            Arg.string("methodName", "Specific test method/function name to run. If omitted, runs all tests in the file").optional();
+    private static final Arg<Optional<String>> TEST_NAME =
+            Arg.string("testName", "Specific test method/function name to run. If omitted, runs all tests in the file").optional();
     private static final Arg<Optional<String>> CONFIGURATION_NAME =
             Arg.string("configurationName", "Name of the run configuration to use. Required when multiple configurations are available. Call without this parameter first to get the list of available configurations.").optional();
     private static final Arg<Integer> TIMEOUT_SECONDS =
@@ -56,13 +56,13 @@ public class RunTestTool extends AbstractMcpTool<Object> {
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return Args.schema(FILE_PATH, METHOD_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT);
+        return Args.schema(FILE_PATH, TEST_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, Object> execute(Map<String, Object> arguments) {
-        return Args.validate(arguments, FILE_PATH, METHOD_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT)
-                .mapN((filePath, methodName, configurationName, timeoutSeconds, project) -> {
+        return Args.validate(arguments, FILE_PATH, TEST_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT)
+                .mapN((filePath, testName, configurationName, timeoutSeconds, project) -> {
                     try {
                         Path resolvedPath = filePath.resolve(project);
 
@@ -78,15 +78,15 @@ public class RunTestTool extends AbstractMcpTool<Object> {
 
                         // Get run configuration candidates
                         List<RunnerAndConfigurationSettings> candidates;
-                        if (methodName.isPresent()) {
-                            candidates = getConfigurationsForMethod(psiFile, methodName.get());
+                        if (testName.isPresent()) {
+                            candidates = getConfigurationsForTest(psiFile, testName.get());
                         } else {
                             candidates = getConfigurationsForFile(psiFile);
                         }
 
                         if (candidates.isEmpty()) {
                             return errorResult("Error: No run configuration found for this file" +
-                                    methodName.map(m -> " and method '" + m + "'").orElse(""));
+                                    testName.map(m -> " and test '" + m + "'").orElse(""));
                         }
 
                         // Selection logic
@@ -150,7 +150,7 @@ public class RunTestTool extends AbstractMcpTool<Object> {
                 .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
-    private List<RunnerAndConfigurationSettings> getConfigurationsForFile(PsiFile psiFile) {
+    List<RunnerAndConfigurationSettings> getConfigurationsForFile(PsiFile psiFile) {
         return ReadAction.compute(() -> {
             ConfigurationContext context = new ConfigurationContext(psiFile);
             List<ConfigurationFromContext> configs = context.getConfigurationsFromContext();
@@ -163,12 +163,12 @@ public class RunTestTool extends AbstractMcpTool<Object> {
         });
     }
 
-    private List<RunnerAndConfigurationSettings> getConfigurationsForMethod(PsiFile psiFile, String methodName) {
+    List<RunnerAndConfigurationSettings> getConfigurationsForTest(PsiFile psiFile, String testName) {
         return ReadAction.compute(() -> {
-            // Find named element matching the method name
+            // Find named element matching the test name
             Collection<PsiNamedElement> namedElements = PsiTreeUtil.findChildrenOfType(psiFile, PsiNamedElement.class);
             for (PsiNamedElement element : namedElements) {
-                if (methodName.equals(element.getName())) {
+                if (testName.equals(element.getName())) {
                     ConfigurationContext context = new ConfigurationContext(element);
                     List<ConfigurationFromContext> configs = context.getConfigurationsFromContext();
                     if (configs != null && !configs.isEmpty()) {

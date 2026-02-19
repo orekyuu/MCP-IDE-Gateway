@@ -9,11 +9,11 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 
-class RunTestToolTest extends BaseMcpToolTest<RunTestTool> {
+class ListTestConfigurationsToolTest extends BaseMcpToolTest<ListTestConfigurationsTool> {
 
     @Override
-    RunTestTool createTool() {
-        return new RunTestTool();
+    ListTestConfigurationsTool createTool() {
+        return new ListTestConfigurationsTool();
     }
 
     @Test
@@ -58,7 +58,7 @@ class RunTestToolTest extends BaseMcpToolTest<RunTestTool> {
     }
 
     @Test
-    void executeWithNoRunConfiguration() throws IOException {
+    void executeWithFileWithNoConfigurations() throws IOException {
         String projectPath = Objects.requireNonNull(getProject().getBasePath());
         Path filePath = Path.of(projectPath, "src", "PlainFile.java");
         Files.createDirectories(filePath.getParent());
@@ -73,27 +73,6 @@ class RunTestToolTest extends BaseMcpToolTest<RunTestTool> {
                 "projectPath", projectPath,
                 "filePath", "src/PlainFile.java"
         ));
-        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("No run configuration found");
+        McpToolResultAssert.assertThat(result).isSuccess();
     }
-
-    @Test
-    void executeWithMethodNameAndNoRunConfiguration() throws IOException {
-        String projectPath = Objects.requireNonNull(getProject().getBasePath());
-        Path filePath = Path.of(projectPath, "src", "SomeTest.java");
-        Files.createDirectories(filePath.getParent());
-        Files.writeString(filePath, """
-                public class SomeTest {
-                    public void testSomething() {}
-                }
-                """);
-        LocalFileSystem.getInstance().refreshAndFindFileByNioFile(filePath);
-
-        var result = tool.execute(Map.of(
-                "projectPath", projectPath,
-                "filePath", "src/SomeTest.java",
-                "testName", "testSomething"
-        ));
-        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("No run configuration found");
-    }
-
 }
