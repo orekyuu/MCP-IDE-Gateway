@@ -37,9 +37,10 @@ class SearchTextToolTest extends BaseMcpToolTest<SearchTextTool> {
 
     @Test
     void executeWithInvalidRegex() {
+        String projectPath = Objects.requireNonNull(getProject().getBasePath());
         var result = tool.execute(Map.of(
                 "searchText", "[invalid(regex",
-                "projectPath", "/some/path",
+                "projectPath", projectPath,
                 "useRegex", true
         ));
         McpToolResultAssert.assertThat(result).hasErrorMessageContaining("Invalid regular expression");

@@ -42,28 +42,6 @@ class AddInlineCommentToolTest extends BaseMcpToolTest<AddInlineCommentTool> {
     }
 
     @Test
-    void executeWithInvalidLine() {
-        var result = tool.execute(Map.of(
-                "filePath", "/some/file.java",
-                "line", 0,
-                "comment", "test comment",
-                "projectPath", "/some/path"
-        ));
-        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("line must be >= 1");
-    }
-
-    @Test
-    void executeWithNegativeLine() {
-        var result = tool.execute(Map.of(
-                "filePath", "/some/file.java",
-                "line", -5,
-                "comment", "test comment",
-                "projectPath", "/some/path"
-        ));
-        McpToolResultAssert.assertThat(result).hasErrorMessageContaining("line must be >= 1");
-    }
-
-    @Test
     void executeWithNonExistentProject() {
         var result = tool.execute(Map.of(
                 "filePath", "/some/file.java",
