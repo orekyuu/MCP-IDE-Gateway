@@ -17,6 +17,13 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends optional="true" config-file="gradle-support.xml">org.jetbrains.plugins.gradle</depends>
+
+    <extensionPoints>
+        <extensionPoint name="testConfigurationExpander"
+                        interface="net.orekyuu.intellijmcp.tools.TestConfigurationExpander"
+                        dynamic="true"/>
+    </extensionPoints>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService

@@ -1,0 +1,6 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="net.orekyuu.mcp-ide-gateway">
+        <testConfigurationExpander
+            implementation="net.orekyuu.intellijmcp.tools.gradle.GradleTestConfigurationExpander"/>
+    </extensions>
+</idea-plugin>

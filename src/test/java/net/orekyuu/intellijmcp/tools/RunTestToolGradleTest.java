@@ -1,5 +1,6 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.execution.actions.ConfigurationContext;
 import com.intellij.execution.actions.ConfigurationFromContext;
 import com.intellij.openapi.application.ReadAction;
@@ -11,6 +12,11 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.platform.externalSystem.testFramework.ExternalSystemImportingTestCase;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.serviceContainer.AlreadyDisposedException;
+import com.intellij.testFramework.LoggedErrorProcessor;
+import com.intellij.util.ui.UIUtil;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.gradle.execution.test.runner.GradleTestRunConfigurationProducer;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
 import org.jetbrains.plugins.gradle.util.GradleConstants;
@@ -19,6 +25,8 @@ import org.jetbrains.plugins.gradle.util.TasksToRun;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -179,23 +187,99 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
         assertThat(taskNames).contains("test", "integrationTest");
     }
 
-    public void testMultipleGradleTestTasksProducesSingleConfigurationPerProducer() throws Exception {
+    /**
+     * A LoggedErrorProcessor that suppresses AlreadyDisposedException.
+     * RunTestTool.execute() uses invokeLater to run the test configuration,
+     * which may execute after the project is disposed in the test environment.
+     */
+    private static final LoggedErrorProcessor SUPPRESS_DISPOSED = new LoggedErrorProcessor() {
+        @Override
+        public @NotNull Set<Action> processError(@NotNull String category, @NotNull String message, String @NotNull [] details, @Nullable Throwable t) {
+            if (t instanceof AlreadyDisposedException) {
+                return Action.NONE;
+            }
+            return Action.ALL;
+        }
+    };
+
+    public void testExecuteWithSimpleGradleProject() throws Exception {
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+        String filePath = "project/src/test/java/com/example/MyTest.java";
+
+        LoggedErrorProcessor.executeWith(SUPPRESS_DISPOSED, () -> {
+            RunTestTool tool = new RunTestTool();
+            var result = tool.execute(Map.of(
+                    "projectPath", projectPath,
+                    "filePath", filePath,
+                    "timeoutSeconds", 1
+            ));
+            // The test may time out, but it should not return a "no configuration found" error.
+            // A timeout response still means config was found and execution was attempted.
+            McpToolResultAssert.assertThat(result).isSuccess();
+            // Flush EDT to process any pending invokeLater callbacks while error processor is active
+            UIUtil.dispatchAllInvocationEvents();
+        });
+    }
+
+    public void testExecuteWithTestNameInGradleProject() throws Exception {
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+        String filePath = "project/src/test/java/com/example/MyTest.java";
+
+        LoggedErrorProcessor.executeWith(SUPPRESS_DISPOSED, () -> {
+            RunTestTool tool = new RunTestTool();
+            var result = tool.execute(Map.of(
+                    "projectPath", projectPath,
+                    "filePath", filePath,
+                    "testName", "testHello",
+                    "timeoutSeconds", 1
+            ));
+            McpToolResultAssert.assertThat(result).isSuccess();
+            UIUtil.dispatchAllInvocationEvents();
+        });
+    }
+
+    public void testMultipleGradleTestTasksExpandedByExpander() throws Exception {
         createProjectConfig(MULTI_TASK_BUILD_GRADLE);
         createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
         importProject();
 
-        // ConfigurationContext.getConfigurationsFromContext returns one config per producer,
-        // so even with multiple test tasks, only one Gradle configuration is produced
-        var configs = getConfigurationsForFile();
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).as("Project base path").isNotNull();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
+
+        PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(myProject).findFile(vf));
+        assertThat(psiFile).isNotNull();
+
+        RunTestTool tool = new RunTestTool();
+        var configs = tool.getConfigurationsForFile(psiFile);
 
         assertThat(configs).isNotNull().isNotEmpty();
 
+        // GradleTestConfigurationExpander should expand into multiple configs (one per task)
         long gradleConfigCount = configs.stream()
-                .filter(c -> c.getConfigurationSettings().getType().getDisplayName().equals("Gradle"))
+                .filter(c -> c.getType().getDisplayName().equals("Gradle"))
                 .count();
+        assertThat(gradleConfigCount)
+                .as("Should have multiple Gradle configs for test and integrationTest")
+                .isGreaterThanOrEqualTo(2);
 
-        // IntelliJ's ConfigurationContext produces one configuration per producer type,
-        // so we get exactly 1 Gradle config even with multiple test tasks
-        assertThat(gradleConfigCount).isEqualTo(1);
+        List<String> configNames = configs.stream()
+                .filter(c -> c.getType().getDisplayName().equals("Gradle"))
+                .map(RunnerAndConfigurationSettings::getName)
+                .toList();
+        assertThat(configNames).anyMatch(name -> name.contains("test"));
+        assertThat(configNames).anyMatch(name -> name.contains("integrationTest"));
     }
 }

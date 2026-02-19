@@ -151,36 +151,53 @@ public class RunTestTool extends AbstractMcpTool<Object> {
     }
 
     List<RunnerAndConfigurationSettings> getConfigurationsForFile(PsiFile psiFile) {
-        return ReadAction.compute(() -> {
+        List<RunnerAndConfigurationSettings> configs = ReadAction.compute(() -> {
             ConfigurationContext context = new ConfigurationContext(psiFile);
-            List<ConfigurationFromContext> configs = context.getConfigurationsFromContext();
-            if (configs != null && !configs.isEmpty()) {
-                return configs.stream()
+            List<ConfigurationFromContext> fromContext = context.getConfigurationsFromContext();
+            if (fromContext != null && !fromContext.isEmpty()) {
+                return fromContext.stream()
                         .map(ConfigurationFromContext::getConfigurationSettings)
                         .toList();
             }
             return List.of();
         });
+        VirtualFile virtualFile = ReadAction.compute(psiFile::getVirtualFile);
+        Project project = ReadAction.compute(psiFile::getProject);
+        return applyExpanders(configs, virtualFile, project);
     }
 
     List<RunnerAndConfigurationSettings> getConfigurationsForTest(PsiFile psiFile, String testName) {
-        return ReadAction.compute(() -> {
+        List<RunnerAndConfigurationSettings> configs = ReadAction.compute(() -> {
             // Find named element matching the test name
             Collection<PsiNamedElement> namedElements = PsiTreeUtil.findChildrenOfType(psiFile, PsiNamedElement.class);
             for (PsiNamedElement element : namedElements) {
                 if (testName.equals(element.getName())) {
                     ConfigurationContext context = new ConfigurationContext(element);
-                    List<ConfigurationFromContext> configs = context.getConfigurationsFromContext();
-                    if (configs != null && !configs.isEmpty()) {
-                        return configs.stream()
+                    List<ConfigurationFromContext> fromContext = context.getConfigurationsFromContext();
+                    if (fromContext != null && !fromContext.isEmpty()) {
+                        return fromContext.stream()
                                 .map(ConfigurationFromContext::getConfigurationSettings)
                                 .toList();
                     }
                 }
             }
-            // Fallback: try file-level configs
-            return getConfigurationsForFile(psiFile);
+            return List.of();
         });
+        if (configs.isEmpty()) {
+            return getConfigurationsForFile(psiFile);
+        }
+        VirtualFile virtualFile = ReadAction.compute(psiFile::getVirtualFile);
+        Project project = ReadAction.compute(psiFile::getProject);
+        return applyExpanders(configs, virtualFile, project);
+    }
+
+    private List<RunnerAndConfigurationSettings> applyExpanders(
+            List<RunnerAndConfigurationSettings> configs, VirtualFile file, Project project) {
+        List<RunnerAndConfigurationSettings> result = configs;
+        for (TestConfigurationExpander expander : TestConfigurationExpander.EP_NAME.getExtensionList()) {
+            result = expander.expand(result, file, project);
+        }
+        return result;
     }
 
     private static String truncateStackTrace(String stackTrace) {

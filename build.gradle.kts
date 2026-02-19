@@ -19,11 +19,10 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
         bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.plugins.gradle")
 
-        instrumentationTools()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
         testBundledPlugin("com.intellij.gradle")
-        testBundledPlugin("org.jetbrains.plugins.gradle")
         testBundledPlugin("JUnit")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Plugin.ExternalSystem)
     }
