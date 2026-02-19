@@ -16,7 +16,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager;
 import com.intellij.psi.*;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
+import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -31,8 +35,32 @@ import java.util.concurrent.atomic.AtomicReference;
 public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.InspectionResponse> {
 
     private static final Logger LOG = Logger.getInstance(RunInspectionTool.class);
-    private static final int DEFAULT_MAX_PROBLEMS = 100;
-    private static final int DEFAULT_TIMEOUT_SECONDS = 60;
+
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Optional<ProjectRelativePath>> FILE_PATH =
+            Arg.optionalProjectRelativePath("filePath", "Relative path from the project root to a specific file to inspect (optional, inspects entire project if not specified)");
+    private static final Arg<List<String>> INSPECTION_NAMES =
+            Arg.stringArray("inspectionNames", "Names of specific inspections to run (optional, runs all enabled inspections if not specified)").optional();
+    public enum Severity {
+        ERROR(4), WARNING(3), WEAK_WARNING(2), INFO(1);
+
+        private final int level;
+
+        Severity(int level) {
+            this.level = level;
+        }
+
+        public int level() {
+            return level;
+        }
+    }
+
+    private static final Arg<Severity> MIN_SEVERITY =
+            Arg.enumArg("minSeverity", "Minimum severity level to report", Severity.class).optional(Severity.INFO);
+    private static final Arg<Integer> MAX_PROBLEMS =
+            Arg.integer("maxProblems", "Maximum number of problems to report").optional(100);
+    private static final Arg<Integer> TIMEOUT =
+            Arg.integer("timeout", "Timeout in seconds. Returns partial results if timeout is reached.").min(0).optional(60);
 
     @Override
     public String getName() {
@@ -46,59 +74,47 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalString("filePath", "Absolute path to a specific file to inspect (optional, inspects entire project if not specified)")
-                .optionalStringArray("inspectionNames", "Names of specific inspections to run (optional, runs all enabled inspections if not specified)")
-                .optionalString("minSeverity", "Minimum severity level to report: ERROR, WARNING, WEAK_WARNING, or INFO (default: INFO, reports all)")
-                .optionalInteger("maxProblems", "Maximum number of problems to report (default: 100)")
-                .optionalInteger("timeout", "Timeout in seconds (default: 60). Returns partial results if timeout is reached.")
-                .build();
+        return Args.schema(PROJECT, FILE_PATH, INSPECTION_NAMES, MIN_SEVERITY, MAX_PROBLEMS, TIMEOUT);
     }
 
     @Override
     @SuppressWarnings("resource") // ScheduledExecutorService is properly shutdown in finally block
     public Result<ErrorResponse, InspectionResponse> execute(Map<String, Object> arguments) {
+        return Args.validate(arguments, PROJECT, FILE_PATH, INSPECTION_NAMES, MIN_SEVERITY, MAX_PROBLEMS, TIMEOUT)
+                .mapN((project, filePathOpt, inspectionNames, minSeverity, maxProblems, timeoutSeconds) -> {
+                    try {
+                        return executeInspection(project, filePathOpt, inspectionNames, minSeverity, maxProblems, timeoutSeconds);
+                    } catch (Exception e) {
+                        LOG.error("Error in run_inspection tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
+    }
+
+    private Result<ErrorResponse, InspectionResponse> executeInspection(
+            Project project, Optional<ProjectRelativePath> filePathOpt,
+            List<String> inspectionNames, Severity minSeverity,
+            int maxProblems, int timeoutSeconds) {
         try {
-            // Parse arguments (no read action needed)
-            Optional<String> filePath = getStringArg(arguments, "filePath");
-            String projectPath;
-            try {
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: projectPath is required");
-            }
-            List<String> inspectionNames = getStringListArg(arguments, "inspectionNames");
-            String minSeverity = getStringArg(arguments, "minSeverity").orElse("INFO");
-            int minSeverityLevel = getSeverityLevel(minSeverity);
-            int maxProblems = arguments.containsKey("maxProblems")
-                    ? ((Number) arguments.get("maxProblems")).intValue()
-                    : DEFAULT_MAX_PROBLEMS;
-            int timeoutSeconds = arguments.containsKey("timeout")
-                    ? ((Number) arguments.get("timeout")).intValue()
-                    : DEFAULT_TIMEOUT_SECONDS;
+            String projectPath = project.getBasePath();
+            int minSeverityLevel = minSeverity.level();
             long timeoutMillis = timeoutSeconds * 1000L;
             long startTime = System.currentTimeMillis();
 
-            // Find project (small read action)
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
-
             // Determine scope (small read action)
             AtomicReference<PsiFile> targetFileRef = new AtomicReference<>();
-            if (filePath.isPresent()) {
-                String filePathStr = filePath.get();
+            if (filePathOpt.isPresent()) {
+                Path resolvedPath = filePathOpt.get().resolve(project);
+                String absolutePath = resolvedPath.toString();
                 String error = ReadAction.compute(() -> {
-                    VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByPath(filePathStr);
+                    VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByPath(absolutePath);
                     if (virtualFile == null) {
-                        return "Error: File not found: " + filePathStr;
+                        return "Error: File not found: " + absolutePath;
                     }
                     PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
                     if (psiFile == null) {
-                        return "Error: Cannot parse file: " + filePathStr;
+                        return "Error: Cannot parse file: " + absolutePath;
                     }
                     targetFileRef.set(psiFile);
                     return null;
