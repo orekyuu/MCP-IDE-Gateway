@@ -15,7 +15,7 @@ import java.util.Map;
 
 /**
  * MCP tool that adds an inline comment to a file in the IDE editor.
- * The comment is displayed as a block inlay above the specified line.
+ * The comment is displayed as a block inlay below the specified line.
  */
 public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.AddInlineCommentResponse> {
 
@@ -34,7 +34,7 @@ public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.A
 
     @Override
     public String getDescription() {
-        return "Add an inline comment to a file in the IDE editor. The comment is displayed as a block inlay above the specified line. Supports Markdown formatting.";
+        return "Add an inline comment to a file in the IDE editor. The comment is displayed as a block inlay below the specified line. Supports Markdown formatting.";
     }
 
     @Override

@@ -133,7 +133,7 @@ public final class InlineCommentEditorListener implements Disposable {
         int lineNumber = comment.getLine() - 1; // Convert to 0-based
         if (lineNumber < 0 || lineNumber >= editor.getDocument().getLineCount()) return;
 
-        int offset = editor.getDocument().getLineStartOffset(lineNumber);
+        int offset = editor.getDocument().getLineEndOffset(lineNumber);
 
         JComponent component = InlineCommentRenderer.createCommentComponent(
                 editor,
@@ -142,8 +142,8 @@ public final class InlineCommentEditorListener implements Disposable {
         );
 
         InlayProperties properties = new InlayProperties()
-                .relatesToPrecedingText(false)
-                .showAbove(true)
+                .relatesToPrecedingText(true)
+                .showAbove(false)
                 .priority(0);
 
         Inlay<?> inlay = ComponentInlayKt.addComponentInlay(
