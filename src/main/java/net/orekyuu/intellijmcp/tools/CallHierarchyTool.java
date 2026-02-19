@@ -9,6 +9,8 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -20,8 +22,14 @@ import java.util.*;
 public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHierarchyResponse> {
 
     private static final Logger LOG = Logger.getInstance(CallHierarchyTool.class);
-    private static final int DEFAULT_DEPTH = 3;
-    private static final int MAX_DEPTH = 10;
+
+    private static final Arg<String> CLASS_NAME =
+            Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
+    private static final Arg<String> MEMBER_NAME =
+            Arg.string("memberName", "Method name to get call hierarchy for").required();
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Integer> DEPTH =
+            Arg.integer("depth", "Maximum depth of the hierarchy to retrieve").max(10).optional(3);
 
     @Override
     public String getName() {
@@ -35,65 +43,41 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
-                .requiredString("memberName", "Method name to get call hierarchy for")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalInteger("depth", "Maximum depth of the hierarchy to retrieve (default: 3, max: 10)")
-                .build();
+        return Args.schema(CLASS_NAME, MEMBER_NAME, PROJECT, DEPTH);
     }
 
     @Override
     public Result<ErrorResponse, CallHierarchyResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String className;
-            String memberName;
-            String projectPath;
-            try {
-                className = getRequiredStringArg(arguments, "className");
-                memberName = getRequiredStringArg(arguments, "memberName");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT, DEPTH)
+                .mapN((className, memberName, project, depth) -> {
+                    try {
+                        // Resolve element
+                        PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
+                                PsiElementResolver.resolve(project, className, memberName));
 
-            int depth = getIntegerArg(arguments, "depth").orElse(DEFAULT_DEPTH);
-            depth = Math.min(depth, MAX_DEPTH);
+                        return switch (resolveResult) {
+                            case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                                    errorResult("Error: Class not found: " + r.className());
+                            case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                                    errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                            case PsiElementResolver.ResolveResult.Success r -> {
+                                if (!(r.element() instanceof PsiMethod method)) {
+                                    yield errorResult("Error: '" + memberName + "' is not a method. Call hierarchy is only available for methods.");
+                                }
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                                // Build call hierarchy
+                                Set<PsiMethod> visited = new HashSet<>();
+                                MethodInfo methodInfo = buildCallHierarchy(project, method, depth, visited);
+                                yield successResult(new CallHierarchyResponse(methodInfo));
+                            }
+                        };
 
-            // Resolve element
-            final int finalDepth = depth;
-            PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
-                    PsiElementResolver.resolve(project, className, memberName));
-
-            return switch (resolveResult) {
-                case PsiElementResolver.ResolveResult.ClassNotFound r ->
-                        errorResult("Error: Class not found: " + r.className());
-                case PsiElementResolver.ResolveResult.MemberNotFound r ->
-                        errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                case PsiElementResolver.ResolveResult.Success r -> {
-                    if (!(r.element() instanceof PsiMethod method)) {
-                        yield errorResult("Error: '" + memberName + "' is not a method. Call hierarchy is only available for methods.");
+                    } catch (Exception e) {
+                        LOG.error("Error in get_call_hierarchy tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-
-                    // Build call hierarchy
-                    Set<PsiMethod> visited = new HashSet<>();
-                    MethodInfo methodInfo = buildCallHierarchy(project, method, finalDepth, visited);
-                    yield successResult(new CallHierarchyResponse(methodInfo));
-                }
-            };
-
-        } catch (Exception e) {
-            LOG.error("Error in get_call_hierarchy tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private MethodInfo buildCallHierarchy(Project project, PsiMethod method, int maxDepth, Set<PsiMethod> visited) {

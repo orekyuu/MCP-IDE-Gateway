@@ -18,9 +18,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
+import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +33,16 @@ public class RunTestTool extends AbstractMcpTool<Object> {
     private static final Logger LOG = Logger.getInstance(RunTestTool.class);
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
     private static final int MAX_STACKTRACE_LINES = 100;
+
+    private static final Arg<ProjectRelativePath> FILE_PATH =
+            Arg.projectRelativePath("filePath", "Relative path to the test file from the project root");
+    private static final Arg<Optional<String>> METHOD_NAME =
+            Arg.string("methodName", "Specific test method/function name to run. If omitted, runs all tests in the file").optional();
+    private static final Arg<Optional<String>> CONFIGURATION_NAME =
+            Arg.string("configurationName", "Name of the run configuration to use. Required when multiple configurations are available. Call without this parameter first to get the list of available configurations.").optional();
+    private static final Arg<Integer> TIMEOUT_SECONDS =
+            Arg.integer("timeoutSeconds", "Timeout in seconds for test execution").min(0).optional(DEFAULT_TIMEOUT_SECONDS);
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -44,123 +56,98 @@ public class RunTestTool extends AbstractMcpTool<Object> {
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .requiredString("filePath", "Relative path to the test file from the project root")
-                .optionalString("methodName", "Specific test method/function name to run. If omitted, runs all tests in the file")
-                .optionalString("configurationName", "Name of the run configuration to use. Required when multiple configurations are available. Call without this parameter first to get the list of available configurations.")
-                .optionalInteger("timeoutSeconds", "Timeout in seconds for test execution (default: 60)")
-                .build();
+        return Args.schema(FILE_PATH, METHOD_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, Object> execute(Map<String, Object> arguments) {
-        try {
-            String projectPath;
-            String filePath;
-            try {
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-                filePath = getRequiredStringArg(arguments, "filePath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, FILE_PATH, METHOD_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT)
+                .mapN((filePath, methodName, configurationName, timeoutSeconds, project) -> {
+                    try {
+                        Path resolvedPath = filePath.resolve(project);
 
-            Optional<String> methodName = getStringArg(arguments, "methodName");
-            Optional<String> configurationName = getStringArg(arguments, "configurationName");
-            int timeoutSeconds = getIntegerArg(arguments, "timeoutSeconds").orElse(DEFAULT_TIMEOUT_SECONDS);
+                        // Find PsiFile
+                        VirtualFile virtualFile = VirtualFileManager.getInstance().findFileByNioPath(resolvedPath);
+                        if (virtualFile == null) {
+                            return errorResult("Error: File not found: " + filePath);
+                        }
+                        PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(project).findFile(virtualFile));
+                        if (psiFile == null) {
+                            return errorResult("Error: Cannot parse file: " + filePath);
+                        }
 
-            // Path traversal prevention
-            Path resolved = Paths.get(projectPath).resolve(filePath).normalize();
-            if (!resolved.startsWith(Paths.get(projectPath).normalize())) {
-                return errorResult("Error: Path is outside the project directory");
-            }
+                        // Get run configuration candidates
+                        List<RunnerAndConfigurationSettings> candidates;
+                        if (methodName.isPresent()) {
+                            candidates = getConfigurationsForMethod(psiFile, methodName.get());
+                        } else {
+                            candidates = getConfigurationsForFile(psiFile);
+                        }
 
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        if (candidates.isEmpty()) {
+                            return errorResult("Error: No run configuration found for this file" +
+                                    methodName.map(m -> " and method '" + m + "'").orElse(""));
+                        }
 
-            // Find PsiFile
-            VirtualFile virtualFile = VirtualFileManager.getInstance().findFileByNioPath(resolved);
-            if (virtualFile == null) {
-                return errorResult("Error: File not found: " + filePath);
-            }
-            PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(project).findFile(virtualFile));
-            if (psiFile == null) {
-                return errorResult("Error: Cannot parse file: " + filePath);
-            }
+                        // Selection logic
+                        RunnerAndConfigurationSettings selectedConfig;
+                        if (candidates.size() == 1) {
+                            selectedConfig = candidates.getFirst();
+                        } else if (configurationName.isEmpty()) {
+                            // Return candidate list for selection
+                            List<ConfigurationCandidate> candidateList = candidates.stream()
+                                    .map(c -> new ConfigurationCandidate(
+                                            c.getName(),
+                                            c.getType().getDisplayName()))
+                                    .toList();
+                            return successResult(new ConfigurationSelectionResponse(
+                                    "Multiple run configurations found. Please specify 'configurationName' to select one.",
+                                    candidateList));
+                        } else {
+                            String targetName = configurationName.get();
+                            selectedConfig = candidates.stream()
+                                    .filter(c -> c.getName().equals(targetName))
+                                    .findFirst()
+                                    .orElse(null);
+                            if (selectedConfig == null) {
+                                List<String> available = candidates.stream().map(RunnerAndConfigurationSettings::getName).toList();
+                                return errorResult("Error: Configuration '" + targetName + "' not found. Available: " + available);
+                            }
+                        }
 
-            // Get run configuration candidates
-            List<RunnerAndConfigurationSettings> candidates;
-            if (methodName.isPresent()) {
-                candidates = getConfigurationsForMethod(psiFile, methodName.get());
-            } else {
-                candidates = getConfigurationsForFile(psiFile);
-            }
+                        // Execute test
+                        CompletableFuture<RunTestResponse> future = new CompletableFuture<>();
+                        TestResultCollector collector = new TestResultCollector(future);
 
-            if (candidates.isEmpty()) {
-                return errorResult("Error: No run configuration found for this file" +
-                        methodName.map(m -> " and method '" + m + "'").orElse(""));
-            }
+                        var connection = project.getMessageBus().connect();
+                        connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, collector);
 
-            // Selection logic
-            RunnerAndConfigurationSettings selectedConfig;
-            if (candidates.size() == 1) {
-                selectedConfig = candidates.getFirst();
-            } else if (configurationName.isEmpty()) {
-                // Return candidate list for selection
-                List<ConfigurationCandidate> candidateList = candidates.stream()
-                        .map(c -> new ConfigurationCandidate(
-                                c.getName(),
-                                c.getType().getDisplayName()))
-                        .toList();
-                return successResult(new ConfigurationSelectionResponse(
-                        "Multiple run configurations found. Please specify 'configurationName' to select one.",
-                        candidateList));
-            } else {
-                String targetName = configurationName.get();
-                selectedConfig = candidates.stream()
-                        .filter(c -> c.getName().equals(targetName))
-                        .findFirst()
-                        .orElse(null);
-                if (selectedConfig == null) {
-                    List<String> available = candidates.stream().map(RunnerAndConfigurationSettings::getName).toList();
-                    return errorResult("Error: Configuration '" + targetName + "' not found. Available: " + available);
-                }
-            }
+                        RunnerAndConfigurationSettings configToRun = selectedConfig;
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            try {
+                                ExecutionUtil.runConfiguration(configToRun, DefaultRunExecutor.getRunExecutorInstance());
+                            } catch (Exception e) {
+                                LOG.error("Error running test configuration", e);
+                                future.completeExceptionally(e);
+                            }
+                        });
 
-            // Execute test
-            CompletableFuture<RunTestResponse> future = new CompletableFuture<>();
-            TestResultCollector collector = new TestResultCollector(future);
+                        try {
+                            RunTestResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
+                            connection.disconnect();
+                            return successResult(response);
+                        } catch (TimeoutException e) {
+                            connection.disconnect();
+                            RunTestResponse timeoutResponse = collector.buildTimeoutResponse();
+                            return successResult(timeoutResponse);
+                        }
 
-            var connection = project.getMessageBus().connect();
-            connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, collector);
-
-            RunnerAndConfigurationSettings configToRun = selectedConfig;
-            ApplicationManager.getApplication().invokeLater(() -> {
-                try {
-                    ExecutionUtil.runConfiguration(configToRun, DefaultRunExecutor.getRunExecutorInstance());
-                } catch (Exception e) {
-                    LOG.error("Error running test configuration", e);
-                    future.completeExceptionally(e);
-                }
-            });
-
-            try {
-                RunTestResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
-                connection.disconnect();
-                return successResult(response);
-            } catch (TimeoutException e) {
-                connection.disconnect();
-                RunTestResponse timeoutResponse = collector.buildTimeoutResponse();
-                return successResult(timeoutResponse);
-            }
-
-        } catch (Exception e) {
-            LOG.error("Error in run_test tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in run_test tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private List<RunnerAndConfigurationSettings> getConfigurationsForFile(PsiFile psiFile) {

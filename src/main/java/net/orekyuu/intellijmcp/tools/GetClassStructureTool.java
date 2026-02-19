@@ -6,6 +6,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -16,6 +18,12 @@ import java.util.*;
 public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool.ClassStructureResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetClassStructureTool.class);
+
+    private static final Arg<String> CLASS_NAME =
+            Arg.string("className", "The class name to get structure for (simple name or fully qualified name)").required();
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Boolean> INCLUDE_INHERITED =
+            Arg.bool("includeInherited", "Whether to include inherited members").optional(false);
 
     @Override
     public String getName() {
@@ -29,54 +37,33 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "The class name to get structure for (simple name or fully qualified name)")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalBoolean("includeInherited", "Whether to include inherited members (default: false)")
-                .build();
+        return Args.schema(CLASS_NAME, PROJECT, INCLUDE_INHERITED);
     }
 
     @Override
     public Result<ErrorResponse, ClassStructureResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                // Get arguments
-                String className;
-                String projectPath;
-                try {
-                    className = getRequiredStringArg(arguments, "className");
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_INHERITED)
+                .mapN((className, project, includeInherited) -> runReadActionWithResult(() -> {
+                    try {
+                        // Find the class
+                        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+                        PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
 
-                boolean includeInherited = getBooleanArg(arguments, "includeInherited").orElse(false);
+                        if (psiClass == null) {
+                            return errorResult("Error: Class not found: " + className);
+                        }
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
+                        // Build structure
+                        ClassStructure structure = buildClassStructure(psiClass, includeInherited);
 
-                // Find the class
-                GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-                PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
+                        return successResult(new ClassStructureResponse(structure));
 
-                if (psiClass == null) {
-                    return errorResult("Error: Class not found: " + className);
-                }
-
-                // Build structure
-                ClassStructure structure = buildClassStructure(psiClass, includeInherited);
-
-                return successResult(new ClassStructureResponse(structure));
-
-            } catch (Exception e) {
-                LOG.error("Error in get_class_structure tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                    } catch (Exception e) {
+                        LOG.error("Error in get_class_structure tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private ClassStructure buildClassStructure(PsiClass psiClass, boolean includeInherited) {

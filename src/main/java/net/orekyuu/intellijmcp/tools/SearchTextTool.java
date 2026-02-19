@@ -12,6 +12,8 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileVisitor;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -30,6 +32,18 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
     private static final Logger LOG = Logger.getInstance(SearchTextTool.class);
     private static final int MAX_RESULTS = 100;
 
+    private static final Arg<String> SEARCH_TEXT =
+            Arg.string("searchText", "The text or pattern to search for").required();
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Boolean> USE_REGEX =
+            Arg.bool("useRegex", "Use regular expression matching").optional(false);
+    private static final Arg<Boolean> CASE_SENSITIVE =
+            Arg.bool("caseSensitive", "Case-sensitive matching").optional(false);
+    private static final Arg<Optional<String>> FILE_PATTERN =
+            Arg.string("filePattern", "File name pattern to filter (e.g., '*.java', '*.xml')").optional();
+    private static final Arg<Integer> MAX_RESULTS_ARG =
+            Arg.integer("maxResults", "Maximum number of results to return").optional(MAX_RESULTS);
+
     @Override
     public String getName() {
         return "search_text";
@@ -42,68 +56,45 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("searchText", "The text or pattern to search for")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalBoolean("useRegex", "Use regular expression matching (default: false)")
-                .optionalBoolean("caseSensitive", "Case-sensitive matching (default: false)")
-                .optionalString("filePattern", "File name pattern to filter (e.g., '*.java', '*.xml')")
-                .optionalInteger("maxResults", "Maximum number of results to return (default: 100)")
-                .build();
+        return Args.schema(SEARCH_TEXT, PROJECT, USE_REGEX, CASE_SENSITIVE, FILE_PATTERN, MAX_RESULTS_ARG);
     }
 
     @Override
     public Result<ErrorResponse, SearchTextResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String searchText;
-            String projectPath;
-            try {
-                searchText = getRequiredStringArg(arguments, "searchText");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, SEARCH_TEXT, PROJECT, USE_REGEX, CASE_SENSITIVE, FILE_PATTERN, MAX_RESULTS_ARG)
+                .mapN((searchText, project, useRegex, caseSensitive, filePatternOpt, maxResults) -> {
+                    try {
+                        String filePattern = filePatternOpt.orElse(null);
 
-            boolean useRegex = getBooleanArg(arguments, "useRegex").orElse(false);
-            boolean caseSensitive = getBooleanArg(arguments, "caseSensitive").orElse(false);
-            String filePattern = getStringArg(arguments, "filePattern").orElse(null);
-            int maxResults = getIntegerArg(arguments, "maxResults").orElse(MAX_RESULTS);
+                        // Validate regex if enabled
+                        if (useRegex) {
+                            try {
+                                Pattern.compile(searchText);
+                            } catch (PatternSyntaxException e) {
+                                return errorResult("Error: Invalid regular expression: " + e.getMessage());
+                            }
+                        }
 
-            // Validate regex if enabled
-            if (useRegex) {
-                try {
-                    Pattern.compile(searchText);
-                } catch (PatternSyntaxException e) {
-                    return errorResult("Error: Invalid regular expression: " + e.getMessage());
-                }
-            }
+                        // Perform search
+                        List<SearchMatch> matches = performSearch(
+                                project, searchText, useRegex, caseSensitive, filePattern, maxResults);
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        return successResult(new SearchTextResponse(
+                                searchText,
+                                useRegex,
+                                caseSensitive,
+                                filePattern,
+                                matches.size(),
+                                matches.size() >= maxResults,
+                                matches
+                        ));
 
-            // Perform search
-            List<SearchMatch> matches = performSearch(
-                    project, searchText, useRegex, caseSensitive, filePattern, maxResults);
-
-            return successResult(new SearchTextResponse(
-                    searchText,
-                    useRegex,
-                    caseSensitive,
-                    filePattern,
-                    matches.size(),
-                    matches.size() >= maxResults,
-                    matches
-            ));
-
-        } catch (Exception e) {
-            LOG.error("Error in search_text tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in search_text tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private List<SearchMatch> performSearch(

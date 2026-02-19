@@ -7,12 +7,13 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -22,7 +23,14 @@ import java.util.regex.Pattern;
 public class FindFileTool extends AbstractMcpTool<FindFileTool.FindFileResponse> {
 
     private static final Logger LOG = Logger.getInstance(FindFileTool.class);
-    private static final int DEFAULT_MAX_RESULTS = 100;
+
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<String> FILE_NAME =
+            Arg.string("fileName", "File name or pattern to search for. Supports glob patterns (* for any characters, ? for single character). Example: '*.java', 'Test*.kt', 'config.?ml'").required();
+    private static final Arg<Boolean> INCLUDE_LIBRARIES =
+            Arg.bool("includeLibraries", "Include library files in search").optional(false);
+    private static final Arg<Integer> MAX_RESULTS =
+            Arg.integer("maxResults", "Maximum number of results to return").optional(100);
 
     @Override
     public String getName() {
@@ -36,57 +44,36 @@ public class FindFileTool extends AbstractMcpTool<FindFileTool.FindFileResponse>
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .requiredString("fileName", "File name or pattern to search for. Supports glob patterns (* for any characters, ? for single character). Example: '*.java', 'Test*.kt', 'config.?ml'")
-                .optionalBoolean("includeLibraries", "Include library files in search (default: false)")
-                .optionalInteger("maxResults", "Maximum number of results to return (default: 100)")
-                .build();
+        return Args.schema(PROJECT, FILE_NAME, INCLUDE_LIBRARIES, MAX_RESULTS);
     }
 
     @Override
     public Result<ErrorResponse, FindFileResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Parse arguments
-            String projectPath;
-            String fileName;
-            try {
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-                fileName = getRequiredStringArg(arguments, "fileName");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, PROJECT, FILE_NAME, INCLUDE_LIBRARIES, MAX_RESULTS)
+                .mapN((project, fileName, includeLibraries, maxResults) -> {
+                    try {
+                        // Determine search scope
+                        GlobalSearchScope scope = includeLibraries
+                                ? GlobalSearchScope.allScope(project)
+                                : GlobalSearchScope.projectScope(project);
 
-            boolean includeLibraries = getBooleanArg(arguments, "includeLibraries").orElse(false);
-            int maxResults = getIntegerArg(arguments, "maxResults").orElse(DEFAULT_MAX_RESULTS);
+                        // Perform search
+                        List<FileInfo> results = performSearch(project, fileName, scope, maxResults);
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        return successResult(new FindFileResponse(
+                                fileName,
+                                includeLibraries,
+                                results.size(),
+                                results.size() >= maxResults,
+                                results
+                        ));
 
-            // Determine search scope
-            GlobalSearchScope scope = includeLibraries
-                    ? GlobalSearchScope.allScope(project)
-                    : GlobalSearchScope.projectScope(project);
-
-            // Perform search
-            List<FileInfo> results = performSearch(project, fileName, scope, maxResults);
-
-            return successResult(new FindFileResponse(
-                    fileName,
-                    includeLibraries,
-                    results.size(),
-                    results.size() >= maxResults,
-                    results
-            ));
-
-        } catch (Exception e) {
-            LOG.error("Error in find_file tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in find_file tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private List<FileInfo> performSearch(Project project, String fileNamePattern, GlobalSearchScope scope, int maxResults) {

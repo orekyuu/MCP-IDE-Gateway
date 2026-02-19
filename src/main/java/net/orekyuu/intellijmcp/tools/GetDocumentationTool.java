@@ -9,6 +9,8 @@ import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -18,6 +20,8 @@ import java.util.*;
 public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.DocumentationResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDocumentationTool.class);
+    private static final Arg<String> SYMBOL_NAME = Arg.string("symbolName", "The symbol name to get documentation for (class name, or class.method/field)").required();
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -31,49 +35,31 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("symbolName", "The symbol name to get documentation for (class name, or class.method/field)")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(SYMBOL_NAME, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, DocumentationResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                // Get arguments
-                String symbolName;
-                String projectPath;
-                try {
-                    symbolName = getRequiredStringArg(arguments, "symbolName");
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, SYMBOL_NAME, PROJECT)
+                .mapN((symbolName, project) -> runReadActionWithResult(() -> {
+                    try {
+                        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
+                        // Parse the symbol name
+                        Documentation doc = findDocumentation(project, symbolName, scope);
 
-                GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+                        if (doc == null) {
+                            return errorResult("Error: Symbol not found or has no documentation: " + symbolName);
+                        }
 
-                // Parse the symbol name
-                Documentation doc = findDocumentation(project, symbolName, scope);
+                        return successResult(new DocumentationResponse(doc));
 
-                if (doc == null) {
-                    return errorResult("Error: Symbol not found or has no documentation: " + symbolName);
-                }
-
-                return successResult(new DocumentationResponse(doc));
-
-            } catch (Exception e) {
-                LOG.error("Error in get_documentation tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                    } catch (Exception e) {
+                        LOG.error("Error in get_documentation tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private Documentation findDocumentation(Project project, String symbolName, GlobalSearchScope scope) {

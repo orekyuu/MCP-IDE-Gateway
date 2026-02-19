@@ -7,9 +7,11 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
+import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -18,6 +20,18 @@ import java.util.concurrent.TimeUnit;
 public class CreateFileOrDirectoryTool extends AbstractMcpTool<CreateFileOrDirectoryTool.CreateResponse> {
 
     private static final Logger LOG = Logger.getInstance(CreateFileOrDirectoryTool.class);
+
+    private static final Arg<ProjectRelativePath> PATH =
+            Arg.projectRelativePath("path", "Relative path from the project root (e.g., 'src/main/java/Foo.java')");
+    private static final Arg<Boolean> IS_DIRECTORY =
+            Arg.bool("isDirectory", "true to create a directory, false to create a file").required();
+    private static final Arg<Optional<String>> CONTENT =
+            Arg.string("content", "Initial content for the file (ignored for directories)").optional();
+    private static final Arg<Boolean> CREATE_PARENTS =
+            Arg.bool("createParents", "Whether to create parent directories if they don't exist").optional(true);
+    private static final Arg<Boolean> OVERWRITE =
+            Arg.bool("overwrite", "Whether to overwrite the file if it already exists").optional(false);
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -31,127 +45,95 @@ public class CreateFileOrDirectoryTool extends AbstractMcpTool<CreateFileOrDirec
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .requiredString("path", "Relative path from the project root (e.g., 'src/main/java/Foo.java')")
-                .requiredBoolean("isDirectory", "true to create a directory, false to create a file")
-                .optionalString("content", "Initial content for the file (ignored for directories)")
-                .optionalBoolean("createParents", "Whether to create parent directories if they don't exist (default: true)")
-                .optionalBoolean("overwrite", "Whether to overwrite the file if it already exists (default: false, ignored for directories)")
-                .build();
+        return Args.schema(PATH, IS_DIRECTORY, CONTENT, CREATE_PARENTS, OVERWRITE, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, CreateResponse> execute(Map<String, Object> arguments) {
-        try {
-            String projectPath;
-            String path;
-            boolean isDirectory;
-            try {
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-                path = getRequiredStringArg(arguments, "path");
-                Object isDirObj = arguments.get("isDirectory");
-                if (isDirObj == null) {
-                    return errorResult("Error: isDirectory is required");
-                }
-                isDirectory = (Boolean) isDirObj;
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, PATH, IS_DIRECTORY, CONTENT, CREATE_PARENTS, OVERWRITE, PROJECT)
+                .mapN((path, isDirectory, content, createParents, overwrite, project) -> {
+                    try {
+                        Path resolvedPath = path.resolve(project);
 
-            Optional<String> content = getStringArg(arguments, "content");
-            boolean createParents = getBooleanArg(arguments, "createParents").orElse(true);
-            boolean overwrite = getBooleanArg(arguments, "overwrite").orElse(false);
+                        CompletableFuture<Result<ErrorResponse, CreateResponse>> future = new CompletableFuture<>();
 
-            // Validate path is within project
-            Path resolved = Paths.get(projectPath).resolve(path).normalize();
-            if (!resolved.startsWith(Paths.get(projectPath).normalize())) {
-                return errorResult("Error: Path is outside the project directory");
-            }
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            try {
+                                WriteCommandAction.runWriteCommandAction(project, "Create File or Directory", null, () -> {
+                                    try {
+                                        if (isDirectory) {
+                                            VirtualFile dir = VfsUtil.createDirectoryIfMissing(resolvedPath.toString());
+                                            if (dir == null) {
+                                                future.complete(errorResult("Error: Failed to create directory: " + path));
+                                                return;
+                                            }
+                                            future.complete(successResult(new CreateResponse(resolvedPath.toString(), true, true, "Directory created successfully")));
+                                        } else {
+                                            // Create parent directories if needed
+                                            Path parentPath = resolvedPath.getParent();
+                                            if (parentPath != null && createParents) {
+                                                VirtualFile parentDir = VfsUtil.createDirectoryIfMissing(parentPath.toString());
+                                                if (parentDir == null) {
+                                                    future.complete(errorResult("Error: Failed to create parent directories for: " + path));
+                                                    return;
+                                                }
+                                            } else if (parentPath != null) {
+                                                VirtualFile parentDir = VfsUtil.findFile(parentPath, true);
+                                                if (parentDir == null || !parentDir.exists()) {
+                                                    future.complete(errorResult("Error: Parent directory does not exist: " + parentPath));
+                                                    return;
+                                                }
+                                            }
 
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                                            Path resolvedParent = resolvedPath.getParent();
+                                            if (resolvedParent == null) {
+                                                future.complete(errorResult("Error: Cannot determine parent directory for: " + path));
+                                                return;
+                                            }
+                                            VirtualFile parentDir = VfsUtil.findFile(resolvedParent, true);
+                                            if (parentDir == null) {
+                                                future.complete(errorResult("Error: Parent directory not found for: " + path));
+                                                return;
+                                            }
 
-            CompletableFuture<Result<ErrorResponse, CreateResponse>> future = new CompletableFuture<>();
+                                            // Check if file already exists
+                                            VirtualFile existing = parentDir.findChild(resolvedPath.getFileName().toString());
+                                            if (existing != null && !overwrite) {
+                                                future.complete(errorResult("Error: File already exists: " + path));
+                                                return;
+                                            }
 
-            ApplicationManager.getApplication().invokeLater(() -> {
-                try {
-                    WriteCommandAction.runWriteCommandAction(project, "Create File or Directory", null, () -> {
-                        try {
-                            if (isDirectory) {
-                                VirtualFile dir = VfsUtil.createDirectoryIfMissing(resolved.toString());
-                                if (dir == null) {
-                                    future.complete(errorResult("Error: Failed to create directory: " + path));
-                                    return;
-                                }
-                                future.complete(successResult(new CreateResponse(path, true, true, "Directory created successfully")));
-                            } else {
-                                // Create parent directories if needed
-                                Path parentPath = resolved.getParent();
-                                if (parentPath != null && createParents) {
-                                    VirtualFile parentDir = VfsUtil.createDirectoryIfMissing(parentPath.toString());
-                                    if (parentDir == null) {
-                                        future.complete(errorResult("Error: Failed to create parent directories for: " + path));
-                                        return;
+                                            VirtualFile file;
+                                            if (existing != null) {
+                                                file = existing;
+                                            } else {
+                                                file = parentDir.createChildData(this, resolvedPath.getFileName().toString());
+                                            }
+                                            if (content.isPresent()) {
+                                                VfsUtil.saveText(file, content.get());
+                                            }
+                                            String message = existing != null ? "File overwritten successfully" : "File created successfully";
+                                            future.complete(successResult(new CreateResponse(resolvedPath.toString(), false, true, message)));
+                                        }
+                                    } catch (Exception e) {
+                                        LOG.error("Error creating file or directory", e);
+                                        future.complete(errorResult("Error: " + e.getMessage()));
                                     }
-                                } else if (parentPath != null) {
-                                    VirtualFile parentDir = VfsUtil.findFile(parentPath, true);
-                                    if (parentDir == null || !parentDir.exists()) {
-                                        future.complete(errorResult("Error: Parent directory does not exist: " + parentPath));
-                                        return;
-                                    }
-                                }
-
-                                java.nio.file.Path resolvedParent = resolved.getParent();
-                                if (resolvedParent == null) {
-                                    future.complete(errorResult("Error: Cannot determine parent directory for: " + path));
-                                    return;
-                                }
-                                VirtualFile parentDir = VfsUtil.findFile(resolvedParent, true);
-                                if (parentDir == null) {
-                                    future.complete(errorResult("Error: Parent directory not found for: " + path));
-                                    return;
-                                }
-
-                                // Check if file already exists
-                                VirtualFile existing = parentDir.findChild(resolved.getFileName().toString());
-                                if (existing != null && !overwrite) {
-                                    future.complete(errorResult("Error: File already exists: " + path));
-                                    return;
-                                }
-
-                                VirtualFile file;
-                                if (existing != null) {
-                                    file = existing;
-                                } else {
-                                    file = parentDir.createChildData(this, resolved.getFileName().toString());
-                                }
-                                if (content.isPresent()) {
-                                    VfsUtil.saveText(file, content.get());
-                                }
-                                String message = existing != null ? "File overwritten successfully" : "File created successfully";
-                                future.complete(successResult(new CreateResponse(path, false, true, message)));
+                                });
+                            } catch (Exception e) {
+                                LOG.error("Error in create_file_or_directory tool", e);
+                                future.complete(errorResult("Error: " + e.getMessage()));
                             }
-                        } catch (Exception e) {
-                            LOG.error("Error creating file or directory", e);
-                            future.complete(errorResult("Error: " + e.getMessage()));
-                        }
-                    });
-                } catch (Exception e) {
-                    LOG.error("Error in create_file_or_directory tool", e);
-                    future.complete(errorResult("Error: " + e.getMessage()));
-                }
-            });
+                        });
 
-            return future.get(30, TimeUnit.SECONDS);
+                        return future.get(30, TimeUnit.SECONDS);
 
-        } catch (Exception e) {
-            LOG.error("Error in create_file_or_directory tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in create_file_or_directory tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     public record CreateResponse(

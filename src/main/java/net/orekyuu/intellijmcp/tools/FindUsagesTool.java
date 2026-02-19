@@ -9,6 +9,8 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -19,6 +21,9 @@ import java.util.*;
 public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesResponse> {
 
     private static final Logger LOG = Logger.getInstance(FindUsagesTool.class);
+    private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
+    private static final Arg<Optional<String>> MEMBER_NAME = Arg.string("memberName", "Method, field, or inner class name. If not specified, finds usages of the class itself").optional();
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -32,85 +37,66 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
-                .optionalString("memberName", "Method, field, or inner class name. If not specified, finds usages of the class itself")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(CLASS_NAME, MEMBER_NAME, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, FindUsagesResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String className;
-            String projectPath;
-            try {
-                className = getRequiredStringArg(arguments, "className");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT)
+                .mapN((className, memberName, project) -> {
+                    try {
+                        // Resolve the target element
+                        PsiElement targetElement = runReadAction(() -> {
+                            PsiElementResolver.ResolveResult result = PsiElementResolver.resolve(project, className, memberName.orElse(null));
+                            if (result instanceof PsiElementResolver.ResolveResult.Success s) {
+                                return s.element();
+                            }
+                            return null;
+                        });
 
-            Optional<String> memberName = getStringArg(arguments, "memberName");
+                        if (targetElement == null) {
+                            PsiElementResolver.ResolveResult result = runReadAction(() -> PsiElementResolver.resolve(project, className, memberName.orElse(null)));
+                            return switch (result) {
+                                case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                                        errorResult("Error: Class not found: " + r.className());
+                                case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                                        errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                                case PsiElementResolver.ResolveResult.Success ignored ->
+                                        errorResult("Error: Unexpected state");
+                            };
+                        }
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        // Get symbol info
+                        SymbolInfo symbolInfo = runReadAction(() -> createSymbolInfo(targetElement));
 
-            // Resolve the target element
-            PsiElement targetElement = runReadAction(() -> {
-                PsiElementResolver.ResolveResult result = PsiElementResolver.resolve(project, className, memberName.orElse(null));
-                if (result instanceof PsiElementResolver.ResolveResult.Success s) {
-                    return s.element();
-                }
-                return null;
-            });
+                        // Search for usages using ReadAction.nonBlocking()
+                        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+                        Collection<PsiReference> references = ReadAction
+                                .nonBlocking(() -> ReferencesSearch.search(targetElement, scope).findAll())
+                                .executeSynchronously();
 
-            if (targetElement == null) {
-                PsiElementResolver.ResolveResult result = runReadAction(() -> PsiElementResolver.resolve(project, className, memberName.orElse(null)));
-                return switch (result) {
-                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
-                            errorResult("Error: Class not found: " + r.className());
-                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
-                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                    case PsiElementResolver.ResolveResult.Success ignored ->
-                            errorResult("Error: Unexpected state");
-                };
-            }
+                        // Convert references to usage info
+                        List<UsageInfo> usages = runReadAction(() -> {
+                            List<UsageInfo> result = new ArrayList<>();
+                            for (PsiReference ref : references) {
+                                UsageInfo usage = createUsageInfo(ref);
+                                if (usage != null) {
+                                    result.add(usage);
+                                }
+                            }
+                            return result;
+                        });
 
-            // Get symbol info
-            SymbolInfo symbolInfo = runReadAction(() -> createSymbolInfo(targetElement));
+                        return successResult(new FindUsagesResponse(symbolInfo, usages));
 
-            // Search for usages using ReadAction.nonBlocking()
-            GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
-            Collection<PsiReference> references = ReadAction
-                    .nonBlocking(() -> ReferencesSearch.search(targetElement, scope).findAll())
-                    .executeSynchronously();
-
-            // Convert references to usage info
-            List<UsageInfo> usages = runReadAction(() -> {
-                List<UsageInfo> result = new ArrayList<>();
-                for (PsiReference ref : references) {
-                    UsageInfo usage = createUsageInfo(ref);
-                    if (usage != null) {
-                        result.add(usage);
+                    } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        LOG.error("Error in find_usages tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-                }
-                return result;
-            });
-
-            return successResult(new FindUsagesResponse(symbolInfo, usages));
-
-        } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
-            throw e;
-        } catch (Exception e) {
-            LOG.error("Error in find_usages tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private SymbolInfo createSymbolInfo(PsiElement element) {

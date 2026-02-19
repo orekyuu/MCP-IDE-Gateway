@@ -10,9 +10,12 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
+import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
+import java.nio.file.Path;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -22,6 +25,10 @@ import java.util.concurrent.TimeUnit;
 public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.OptimizeImportsResponse> {
 
     private static final Logger LOG = Logger.getInstance(OptimizeImportsTool.class);
+
+    private static final Arg<ProjectRelativePath> FILE_PATH =
+            Arg.projectRelativePath("filePath", "Relative path to the file to optimize imports");
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -35,72 +42,59 @@ public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.Opt
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("filePath", "Absolute path to the file to optimize imports")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(FILE_PATH, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, OptimizeImportsResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String filePath;
-            String projectPath;
-            try {
-                filePath = getRequiredStringArg(arguments, "filePath");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, FILE_PATH, PROJECT)
+                .mapN((filePath, project) -> {
+                    try {
+                        Path resolvedPath = filePath.resolve(project);
+                        String absolutePath = resolvedPath.toString();
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        // Find the file
+                        VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByPath(absolutePath);
+                        if (virtualFile == null) {
+                            return errorResult("Error: File not found: " + absolutePath);
+                        }
 
-            // Find the file
-            VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath);
-            if (virtualFile == null) {
-                return errorResult("Error: File not found: " + filePath);
-            }
+                        // Get PsiFile
+                        PsiFile psiFile = runReadAction(() -> PsiManager.getInstance(project).findFile(virtualFile));
+                        if (psiFile == null) {
+                            return errorResult("Error: Cannot parse file: " + absolutePath);
+                        }
 
-            // Get PsiFile
-            PsiFile psiFile = runReadAction(() -> PsiManager.getInstance(project).findFile(virtualFile));
-            if (psiFile == null) {
-                return errorResult("Error: Cannot parse file: " + filePath);
-            }
+                        // Run optimize imports on EDT
+                        CompletableFuture<Result<ErrorResponse, OptimizeImportsResponse>> future = new CompletableFuture<>();
 
-            // Run optimize imports on EDT
-            CompletableFuture<Result<ErrorResponse, OptimizeImportsResponse>> future = new CompletableFuture<>();
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            try {
+                                WriteCommandAction.runWriteCommandAction(project, "Optimize Imports", null, () -> {
+                                    OptimizeImportsProcessor processor = new OptimizeImportsProcessor(project, psiFile);
+                                    processor.run();
+                                });
 
-            ApplicationManager.getApplication().invokeLater(() -> {
-                try {
-                    WriteCommandAction.runWriteCommandAction(project, "Optimize Imports", null, () -> {
-                        OptimizeImportsProcessor processor = new OptimizeImportsProcessor(project, psiFile);
-                        processor.run();
-                    });
+                                future.complete(successResult(new OptimizeImportsResponse(
+                                        absolutePath,
+                                        true,
+                                        "Imports optimized successfully"
+                                )));
+                            } catch (Exception e) {
+                                LOG.error("Error optimizing imports", e);
+                                future.complete(errorResult("Error: " + e.getMessage()));
+                            }
+                        });
 
-                    future.complete(successResult(new OptimizeImportsResponse(
-                            filePath,
-                            true,
-                            "Imports optimized successfully"
-                    )));
-                } catch (Exception e) {
-                    LOG.error("Error optimizing imports", e);
-                    future.complete(errorResult("Error: " + e.getMessage()));
-                }
-            });
+                        // Wait for completion with timeout
+                        return future.get(30, TimeUnit.SECONDS);
 
-            // Wait for completion with timeout
-            return future.get(30, TimeUnit.SECONDS);
-
-        } catch (Exception e) {
-            LOG.error("Error in optimize_imports tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in optimize_imports tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     // Response record

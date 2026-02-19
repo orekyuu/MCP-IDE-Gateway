@@ -5,6 +5,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +18,9 @@ import java.util.Optional;
 public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefinitionResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDefinitionTool.class);
+    private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
+    private static final Arg<Optional<String>> MEMBER_NAME = Arg.string("memberName", "Method, field, or inner class name. If not specified, returns the class definition").optional();
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -29,58 +34,37 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
-                .optionalString("memberName", "Method, field, or inner class name. If not specified, returns the class definition")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(CLASS_NAME, MEMBER_NAME, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, GetDefinitionResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                // Get arguments
-                String className;
-                String projectPath;
-                try {
-                    className = getRequiredStringArg(arguments, "className");
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT)
+                .mapN((className, memberName, project) -> runReadActionWithResult(() -> {
+                    try {
+                        // Resolve element
+                        PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
 
-                Optional<String> memberName = getStringArg(arguments, "memberName");
+                        return switch (resolveResult) {
+                            case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                                    errorResult("Error: Class not found: " + r.className());
+                            case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                                    errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                            case PsiElementResolver.ResolveResult.Success r -> {
+                                DefinitionInfo info = createDefinitionInfo(r.element());
+                                if (info == null) {
+                                    yield errorResult("Error: Could not get definition information");
+                                }
+                                yield successResult(new GetDefinitionResponse(info));
+                            }
+                        };
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
-
-                // Resolve element
-                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
-
-                return switch (resolveResult) {
-                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
-                            errorResult("Error: Class not found: " + r.className());
-                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
-                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                    case PsiElementResolver.ResolveResult.Success r -> {
-                        DefinitionInfo info = createDefinitionInfo(r.element());
-                        if (info == null) {
-                            yield errorResult("Error: Could not get definition information");
-                        }
-                        yield successResult(new GetDefinitionResponse(info));
+                    } catch (Exception e) {
+                        LOG.error("Error in get_definition tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-                };
-
-            } catch (Exception e) {
-                LOG.error("Error in get_definition tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private DefinitionInfo createDefinitionInfo(PsiElement element) {

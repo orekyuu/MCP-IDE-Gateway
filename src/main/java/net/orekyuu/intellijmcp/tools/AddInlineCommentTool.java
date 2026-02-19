@@ -6,16 +6,26 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import io.modelcontextprotocol.spec.McpSchema;
 import net.orekyuu.intellijmcp.comment.InlineComment;
 import net.orekyuu.intellijmcp.comment.InlineCommentService;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
+import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * MCP tool that adds an inline comment to a file in the IDE editor.
  * The comment is displayed as a block inlay above the specified line.
  */
 public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.AddInlineCommentResponse> {
+
+    private static final Arg<ProjectRelativePath> FILE_PATH =
+            Arg.projectRelativePath("filePath", "Relative path to the file to add a comment to");
+    private static final Arg<Integer> LINE =
+            Arg.integer("line", "Line number to add the comment at (1-based)").min(1).required();
+    private static final Arg<String> COMMENT =
+            Arg.string("comment", "The comment text to display (supports Markdown)").required();
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -29,69 +39,41 @@ public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.A
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("filePath", "Absolute path to the file to add a comment to")
-                .requiredInteger("line", "Line number to add the comment at (1-based)")
-                .requiredString("comment", "The comment text to display (supports Markdown)")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(FILE_PATH, LINE, COMMENT, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, AddInlineCommentResponse> execute(Map<String, Object> arguments) {
-        try {
-            String filePath;
-            String projectPath;
-            String comment;
-            int line;
+        return Args.validate(arguments, FILE_PATH, LINE, COMMENT, PROJECT)
+                .mapN((filePath, line, comment, project) -> {
+                    try {
+                        Path resolvedPath = filePath.resolve(project);
+                        String absolutePath = resolvedPath.toString();
 
-            try {
-                filePath = getRequiredStringArg(arguments, "filePath");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-                comment = getRequiredStringArg(arguments, "comment");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+                        // Check file exists
+                        VirtualFile file = runReadAction(() ->
+                                VirtualFileManager.getInstance().findFileByNioPath(resolvedPath)
+                        );
+                        if (file == null) {
+                            return errorResult("Error: File not found: " + absolutePath);
+                        }
 
-            Optional<Integer> lineOpt = getIntegerArg(arguments, "line");
-            if (lineOpt.isEmpty()) {
-                return errorResult("Error: line is required");
-            }
-            line = lineOpt.get();
+                        // Add the comment
+                        InlineComment inlineComment = InlineCommentService.getInstance(project)
+                                .addComment(absolutePath, line, comment);
 
-            if (line < 1) {
-                return errorResult("Error: line must be >= 1, got: " + line);
-            }
-
-            // Find target project
-            Optional<Project> targetProject = findProjectByPath(projectPath);
-            if (targetProject.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-
-            // Check file exists
-            VirtualFile file = runReadAction(() ->
-                    VirtualFileManager.getInstance().findFileByNioPath(Paths.get(filePath))
-            );
-            if (file == null) {
-                return errorResult("Error: File not found: " + filePath);
-            }
-
-            // Add the comment
-            Project project = targetProject.get();
-            InlineComment inlineComment = InlineCommentService.getInstance(project)
-                    .addComment(filePath, line, comment);
-
-            return successResult(new AddInlineCommentResponse(
-                    inlineComment.getId(),
-                    filePath,
-                    line,
-                    comment,
-                    "Inline comment added successfully"
-            ));
-        } catch (Exception e) {
-            return errorResult("Error: " + e.getMessage());
-        }
+                        return successResult(new AddInlineCommentResponse(
+                                inlineComment.getId(),
+                                absolutePath,
+                                line,
+                                comment,
+                                "Inline comment added successfully"
+                        ));
+                    } catch (Exception e) {
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     public record AddInlineCommentResponse(

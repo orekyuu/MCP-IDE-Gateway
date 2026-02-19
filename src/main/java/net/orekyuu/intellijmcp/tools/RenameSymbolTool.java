@@ -7,6 +7,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.refactoring.rename.RenameProcessor;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.Map;
 import java.util.Optional;
@@ -19,6 +21,10 @@ import java.util.concurrent.TimeUnit;
 public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSymbolResponse> {
 
     private static final Logger LOG = Logger.getInstance(RenameSymbolTool.class);
+    private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
+    private static final Arg<Optional<String>> MEMBER_NAME = Arg.string("memberName", "Method or field name. If not specified, renames the class itself").optional();
+    private static final Arg<String> NEW_NAME = Arg.string("newName", "The new name for the symbol").required();
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -32,95 +38,73 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
-                .optionalString("memberName", "Method or field name. If not specified, renames the class itself")
-                .requiredString("newName", "The new name for the symbol")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(CLASS_NAME, MEMBER_NAME, NEW_NAME, PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, RenameSymbolResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String className;
-            String newName;
-            String projectPath;
-            try {
-                className = getRequiredStringArg(arguments, "className");
-                newName = getRequiredStringArg(arguments, "newName");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, NEW_NAME, PROJECT)
+                .mapN((className, memberName, newName, project) -> {
+                    try {
+                        // Resolve element
+                        PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
+                                PsiElementResolver.resolve(project, className, memberName.orElse(null)));
 
-            Optional<String> memberName = getStringArg(arguments, "memberName");
+                        return switch (resolveResult) {
+                            case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                                    errorResult("Error: Class not found: " + r.className());
+                            case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                                    errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                            case PsiElementResolver.ResolveResult.Success r -> {
+                                PsiElement namedElement = r.element();
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                                String oldName = runReadAction(() -> {
+                                    if (namedElement instanceof PsiNamedElement named) {
+                                        return named.getName();
+                                    }
+                                    return null;
+                                });
 
-            // Resolve element
-            PsiElementResolver.ResolveResult resolveResult = runReadAction(() ->
-                    PsiElementResolver.resolve(project, className, memberName.orElse(null)));
+                                // Perform rename on EDT
+                                CompletableFuture<Result<ErrorResponse, RenameSymbolResponse>> future = new CompletableFuture<>();
 
-            return switch (resolveResult) {
-                case PsiElementResolver.ResolveResult.ClassNotFound r ->
-                        errorResult("Error: Class not found: " + r.className());
-                case PsiElementResolver.ResolveResult.MemberNotFound r ->
-                        errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                case PsiElementResolver.ResolveResult.Success r -> {
-                    PsiElement namedElement = r.element();
+                                ApplicationManager.getApplication().invokeLater(() -> {
+                                    try {
+                                        WriteCommandAction.runWriteCommandAction(project, "Rename Symbol", null, () -> {
+                                            RenameProcessor processor = new RenameProcessor(
+                                                    project,
+                                                    namedElement,
+                                                    newName,
+                                                    false,  // searchInComments
+                                                    false   // searchInNonJavaFiles
+                                            );
+                                            processor.run();
+                                        });
 
-                    String oldName = runReadAction(() -> {
-                        if (namedElement instanceof PsiNamedElement named) {
-                            return named.getName();
-                        }
-                        return null;
-                    });
+                                        future.complete(successResult(new RenameSymbolResponse(
+                                                className,
+                                                oldName,
+                                                newName,
+                                                true,
+                                                "Symbol renamed successfully"
+                                        )));
+                                    } catch (Exception e) {
+                                        LOG.error("Error renaming symbol", e);
+                                        future.complete(errorResult("Error: " + e.getMessage()));
+                                    }
+                                });
 
-                    // Perform rename on EDT
-                    CompletableFuture<Result<ErrorResponse, RenameSymbolResponse>> future = new CompletableFuture<>();
+                                // Wait for completion with timeout
+                                yield future.get(30, TimeUnit.SECONDS);
+                            }
+                        };
 
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        try {
-                            WriteCommandAction.runWriteCommandAction(project, "Rename Symbol", null, () -> {
-                                RenameProcessor processor = new RenameProcessor(
-                                        project,
-                                        namedElement,
-                                        newName,
-                                        false,  // searchInComments
-                                        false   // searchInNonJavaFiles
-                                );
-                                processor.run();
-                            });
-
-                            future.complete(successResult(new RenameSymbolResponse(
-                                    className,
-                                    oldName,
-                                    newName,
-                                    true,
-                                    "Symbol renamed successfully"
-                            )));
-                        } catch (Exception e) {
-                            LOG.error("Error renaming symbol", e);
-                            future.complete(errorResult("Error: " + e.getMessage()));
-                        }
-                    });
-
-                    // Wait for completion with timeout
-                    yield future.get(30, TimeUnit.SECONDS);
-                }
-            };
-
-        } catch (Exception e) {
-            LOG.error("Error in rename_symbol tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                    } catch (Exception e) {
+                        LOG.error("Error in rename_symbol tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     public record RenameSymbolResponse(

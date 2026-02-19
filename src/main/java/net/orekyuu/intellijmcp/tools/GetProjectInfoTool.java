@@ -8,6 +8,8 @@ import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -17,6 +19,8 @@ import java.util.*;
 public class GetProjectInfoTool extends AbstractMcpTool<GetProjectInfoTool.GetProjectInfoResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetProjectInfoTool.class);
+
+    private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getName() {
@@ -30,93 +34,81 @@ public class GetProjectInfoTool extends AbstractMcpTool<GetProjectInfoTool.GetPr
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .build();
+        return Args.schema(PROJECT);
     }
 
     @Override
     public Result<ErrorResponse, GetProjectInfoResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                String projectPath;
-                try {
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, PROJECT)
+                .mapN(project -> runReadActionWithResult(() -> {
+                    try {
+                        String basePath = project.getBasePath();
 
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
-                String basePath = project.getBasePath();
+                        Module[] modules = ModuleManager.getInstance(project).getModules();
+                        List<ModuleInfo> moduleInfos = new ArrayList<>();
 
-                Module[] modules = ModuleManager.getInstance(project).getModules();
-                List<ModuleInfo> moduleInfos = new ArrayList<>();
+                        for (Module module : modules) {
+                            ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
 
-                for (Module module : modules) {
-                    ModuleRootManager rootManager = ModuleRootManager.getInstance(module);
+                            // SDK
+                            SdkInfo sdkInfo = null;
+                            Sdk sdk = rootManager.getSdk();
+                            if (sdk != null) {
+                                sdkInfo = new SdkInfo(
+                                        sdk.getName(),
+                                        sdk.getVersionString(),
+                                        sdk.getSdkType().getName()
+                                );
+                            }
 
-                    // SDK
-                    SdkInfo sdkInfo = null;
-                    Sdk sdk = rootManager.getSdk();
-                    if (sdk != null) {
-                        sdkInfo = new SdkInfo(
-                                sdk.getName(),
-                                sdk.getVersionString(),
-                                sdk.getSdkType().getName()
-                        );
-                    }
+                            // Source roots
+                            List<SourceRootInfo> sourceRoots = new ArrayList<>();
+                            for (ContentEntry contentEntry : rootManager.getContentEntries()) {
+                                for (SourceFolder sourceFolder : contentEntry.getSourceFolders()) {
+                                    VirtualFile file = sourceFolder.getFile();
+                                    if (file == null) continue;
 
-                    // Source roots
-                    List<SourceRootInfo> sourceRoots = new ArrayList<>();
-                    for (ContentEntry contentEntry : rootManager.getContentEntries()) {
-                        for (SourceFolder sourceFolder : contentEntry.getSourceFolders()) {
-                            VirtualFile file = sourceFolder.getFile();
-                            if (file == null) continue;
-
-                            String path = toRelativePath(file.getPath(), basePath);
-                            String type = resolveSourceRootType(sourceFolder);
-                            sourceRoots.add(new SourceRootInfo(path, type));
-                        }
-                    }
-
-                    // Module dependencies
-                    List<String> moduleDependencies = new ArrayList<>();
-                    for (Module dep : rootManager.getDependencies()) {
-                        moduleDependencies.add(dep.getName());
-                    }
-
-                    // Library dependencies
-                    List<String> libraries = new ArrayList<>();
-                    OrderEnumerator.orderEntries(module)
-                            .librariesOnly()
-                            .forEachLibrary(library -> {
-                                String name = library.getName();
-                                if (name != null) {
-                                    libraries.add(name);
+                                    String path = toRelativePath(file.getPath(), basePath);
+                                    String type = resolveSourceRootType(sourceFolder);
+                                    sourceRoots.add(new SourceRootInfo(path, type));
                                 }
-                                return true;
-                            });
+                            }
 
-                    moduleInfos.add(new ModuleInfo(
-                            module.getName(),
-                            sdkInfo,
-                            sourceRoots,
-                            moduleDependencies,
-                            libraries
-                    ));
-                }
+                            // Module dependencies
+                            List<String> moduleDependencies = new ArrayList<>();
+                            for (Module dep : rootManager.getDependencies()) {
+                                moduleDependencies.add(dep.getName());
+                            }
 
-                return successResult(new GetProjectInfoResponse(project.getName(), moduleInfos));
+                            // Library dependencies
+                            List<String> libraries = new ArrayList<>();
+                            OrderEnumerator.orderEntries(module)
+                                    .librariesOnly()
+                                    .forEachLibrary(library -> {
+                                        String name = library.getName();
+                                        if (name != null) {
+                                            libraries.add(name);
+                                        }
+                                        return true;
+                                    });
 
-            } catch (Exception e) {
-                LOG.error("Error in get_project_info tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                            moduleInfos.add(new ModuleInfo(
+                                    module.getName(),
+                                    sdkInfo,
+                                    sourceRoots,
+                                    moduleDependencies,
+                                    libraries
+                            ));
+                        }
+
+                        return successResult(new GetProjectInfoResponse(project.getName(), moduleInfos));
+
+                    } catch (Exception e) {
+                        LOG.error("Error in get_project_info tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private String resolveSourceRootType(SourceFolder sourceFolder) {

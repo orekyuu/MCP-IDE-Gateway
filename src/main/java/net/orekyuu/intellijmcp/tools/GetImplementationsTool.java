@@ -8,6 +8,8 @@ import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -17,6 +19,12 @@ import java.util.*;
 public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTool.GetImplementationsResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetImplementationsTool.class);
+
+    private static final Arg<String> CLASS_NAME =
+            Arg.string("className", "The class or interface name to find implementations for (simple name or fully qualified name)").required();
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Boolean> INCLUDE_ABSTRACT =
+            Arg.bool("includeAbstract", "Whether to include abstract classes in the results").optional(true);
 
     @Override
     public String getName() {
@@ -30,73 +38,54 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "The class or interface name to find implementations for (simple name or fully qualified name)")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalBoolean("includeAbstract", "Whether to include abstract classes in the results (default: true)")
-                .build();
+        return Args.schema(CLASS_NAME, PROJECT, INCLUDE_ABSTRACT);
     }
 
     @Override
     public Result<ErrorResponse, GetImplementationsResponse> execute(Map<String, Object> arguments) {
-        try {
-            // Get arguments
-            String className;
-            String projectPath;
-            try {
-                className = getRequiredStringArg(arguments, "className");
-                projectPath = getRequiredStringArg(arguments, "projectPath");
-            } catch (IllegalArgumentException e) {
-                return errorResult("Error: " + e.getMessage());
-            }
+        return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_ABSTRACT)
+                .mapN((className, project, includeAbstract) -> {
+                    try {
+                        // Find the target class
+                        PsiClass targetClass = runReadAction(() ->
+                                PsiElementResolver.findClass(project, className, GlobalSearchScope.allScope(project)));
 
-            boolean includeAbstract = getBooleanArg(arguments, "includeAbstract").orElse(true);
+                        if (targetClass == null) {
+                            return errorResult("Error: Class not found: " + className);
+                        }
 
-            // Find project
-            Optional<Project> projectOpt = findProjectByPath(projectPath);
-            if (projectOpt.isEmpty()) {
-                return errorResult("Error: Project not found at path: " + projectPath);
-            }
-            Project project = projectOpt.get();
+                        // Get target class info
+                        ClassInfo targetInfo = runReadAction(() -> createClassInfo(targetClass));
 
-            // Find the target class
-            PsiClass targetClass = runReadAction(() ->
-                    PsiElementResolver.findClass(project, className, GlobalSearchScope.allScope(project)));
+                        // Search for implementations using ReadAction.nonBlocking()
+                        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+                        Collection<PsiClass> inheritors = ReadAction
+                                .nonBlocking(() -> ClassInheritorsSearch.search(targetClass, scope, true).findAll())
+                                .executeSynchronously();
 
-            if (targetClass == null) {
-                return errorResult("Error: Class not found: " + className);
-            }
+                        // Convert to implementation info
+                        List<ClassInfo> implementations = runReadAction(() -> {
+                            List<ClassInfo> result = new ArrayList<>();
+                            for (PsiClass inheritor : inheritors) {
+                                // Skip abstract classes if not included
+                                if (!includeAbstract && inheritor.hasModifierProperty(PsiModifier.ABSTRACT)) {
+                                    continue;
+                                }
+                                result.add(createClassInfo(inheritor));
+                            }
+                            return result;
+                        });
 
-            // Get target class info
-            ClassInfo targetInfo = runReadAction(() -> createClassInfo(targetClass));
+                        return successResult(new GetImplementationsResponse(targetInfo, implementations));
 
-            // Search for implementations using ReadAction.nonBlocking()
-            GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
-            Collection<PsiClass> inheritors = ReadAction
-                    .nonBlocking(() -> ClassInheritorsSearch.search(targetClass, scope, true).findAll())
-                    .executeSynchronously();
-
-            // Convert to implementation info
-            List<ClassInfo> implementations = runReadAction(() -> {
-                List<ClassInfo> result = new ArrayList<>();
-                for (PsiClass inheritor : inheritors) {
-                    // Skip abstract classes if not included
-                    if (!includeAbstract && inheritor.hasModifierProperty(PsiModifier.ABSTRACT)) {
-                        continue;
+                    } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        LOG.error("Error in get_implementations tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-                    result.add(createClassInfo(inheritor));
-                }
-                return result;
-            });
-
-            return successResult(new GetImplementationsResponse(targetInfo, implementations));
-
-        } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
-            throw e;
-        } catch (Exception e) {
-            LOG.error("Error in get_implementations tool", e);
-            return errorResult("Error: " + e.getMessage());
-        }
+                })
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private ClassInfo createClassInfo(PsiClass psiClass) {

@@ -5,6 +5,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +18,9 @@ import java.util.Optional;
 public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSourceCodeResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetSourceCodeTool.class);
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
+    private static final Arg<Optional<String>> MEMBER_NAME = Arg.string("memberName", "Method or field name. If not specified, returns the entire class source code").optional();
 
     @Override
     public String getName() {
@@ -29,91 +34,70 @@ public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSour
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .requiredString("className", "Fully qualified class name (e.g., 'com.example.MyClass')")
-                .optionalString("memberName", "Method or field name. If not specified, returns the entire class source code")
-                .build();
+        return Args.schema(PROJECT, CLASS_NAME, MEMBER_NAME);
     }
 
     @Override
     public Result<ErrorResponse, GetSourceCodeResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                // Get arguments
-                String projectPath;
-                String className;
-                try {
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                    className = getRequiredStringArg(arguments, "className");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, PROJECT, CLASS_NAME, MEMBER_NAME)
+                .mapN((project, className, memberName) -> runReadActionWithResult(() -> {
+                    try {
+                        // Resolve element using PsiElementResolver
+                        PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
 
-                Optional<String> memberName = getStringArg(arguments, "memberName");
+                        return switch (resolveResult) {
+                            case PsiElementResolver.ResolveResult.ClassNotFound r ->
+                                    errorResult("Error: Class not found: " + r.className());
+                            case PsiElementResolver.ResolveResult.MemberNotFound r ->
+                                    errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
+                            case PsiElementResolver.ResolveResult.Success r -> {
+                                PsiElement targetElement = r.element();
+                                String kind = r.kind();
+                                String name = r.name();
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
+                                // Get source code
+                                String sourceCode = targetElement.getText();
 
-                // Resolve element using PsiElementResolver
-                PsiElementResolver.ResolveResult resolveResult = PsiElementResolver.resolve(project, className, memberName.orElse(null));
+                                // Get file path and line range
+                                String filePath = null;
+                                LineRange lineRange = null;
 
-                return switch (resolveResult) {
-                    case PsiElementResolver.ResolveResult.ClassNotFound r ->
-                            errorResult("Error: Class not found: " + r.className());
-                    case PsiElementResolver.ResolveResult.MemberNotFound r ->
-                            errorResult("Error: Member '" + r.memberName() + "' not found in class: " + r.className());
-                    case PsiElementResolver.ResolveResult.Success r -> {
-                        PsiElement targetElement = r.element();
-                        String kind = r.kind();
-                        String name = r.name();
+                                PsiFile containingFile = targetElement.getContainingFile();
+                                if (containingFile != null) {
+                                    VirtualFile virtualFile = containingFile.getVirtualFile();
+                                    if (virtualFile != null) {
+                                        filePath = virtualFile.getPath();
+                                    }
 
-                        // Get source code
-                        String sourceCode = targetElement.getText();
-
-                        // Get file path and line range
-                        String filePath = null;
-                        LineRange lineRange = null;
-
-                        PsiFile containingFile = targetElement.getContainingFile();
-                        if (containingFile != null) {
-                            VirtualFile virtualFile = containingFile.getVirtualFile();
-                            if (virtualFile != null) {
-                                filePath = virtualFile.getPath();
-                            }
-
-                            var textRange = targetElement.getTextRange();
-                            if (textRange != null) {
-                                com.intellij.openapi.editor.Document document =
-                                        PsiDocumentManager.getInstance(project).getDocument(containingFile);
-                                if (document != null) {
-                                    int startLine = document.getLineNumber(textRange.getStartOffset()) + 1;
-                                    int endLine = document.getLineNumber(textRange.getEndOffset()) + 1;
-                                    lineRange = new LineRange(startLine, endLine);
+                                    var textRange = targetElement.getTextRange();
+                                    if (textRange != null) {
+                                        com.intellij.openapi.editor.Document document =
+                                                PsiDocumentManager.getInstance(project).getDocument(containingFile);
+                                        if (document != null) {
+                                            int startLine = document.getLineNumber(textRange.getStartOffset()) + 1;
+                                            int endLine = document.getLineNumber(textRange.getEndOffset()) + 1;
+                                            lineRange = new LineRange(startLine, endLine);
+                                        }
+                                    }
                                 }
+
+                                yield successResult(new GetSourceCodeResponse(
+                                        name,
+                                        kind,
+                                        className,
+                                        sourceCode,
+                                        filePath,
+                                        lineRange
+                                ));
                             }
-                        }
+                        };
 
-                        yield successResult(new GetSourceCodeResponse(
-                                name,
-                                kind,
-                                className,
-                                sourceCode,
-                                filePath,
-                                lineRange
-                        ));
+                    } catch (Exception e) {
+                        LOG.error("Error in get_source_code tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-                };
-
-            } catch (Exception e) {
-                LOG.error("Error in get_source_code tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     public record GetSourceCodeResponse(

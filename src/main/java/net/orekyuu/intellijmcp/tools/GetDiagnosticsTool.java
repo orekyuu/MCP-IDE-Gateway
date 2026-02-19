@@ -15,6 +15,8 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -25,6 +27,10 @@ import java.util.*;
 public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDiagnosticsResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDiagnosticsTool.class);
+
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Boolean> ERRORS_ONLY =
+            Arg.bool("errorsOnly", "Whether to return only errors, excluding warnings").optional(false);
 
     @Override
     public String getName() {
@@ -38,85 +44,69 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalBoolean("errorsOnly", "Whether to return only errors, excluding warnings (default: false)")
-                .build();
+        return Args.schema(PROJECT, ERRORS_ONLY);
     }
 
     @Override
     public Result<ErrorResponse, GetDiagnosticsResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                String projectPath;
-                try {
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: projectPath is required");
-                }
-                boolean errorsOnly = getBooleanArg(arguments, "errorsOnly").orElse(false);
+        return Args.validate(arguments, PROJECT, ERRORS_ONLY)
+                .mapN((project, errorsOnly) -> runReadActionWithResult(() -> {
+                    try {
+                        // Get problem files using WolfTheProblemSolver
+                        WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
+                        List<FileDiagnostics> fileDiagnosticsList = new ArrayList<>();
+                        int totalErrors = 0;
+                        int totalWarnings = 0;
 
-                // Get problem files using WolfTheProblemSolver
-                WolfTheProblemSolver problemSolver = WolfTheProblemSolver.getInstance(project);
+                        // Get all source roots and scan for problems
+                        VirtualFile[] contentRoots = com.intellij.openapi.roots.ProjectRootManager
+                                .getInstance(project).getContentSourceRoots();
 
-                List<FileDiagnostics> fileDiagnosticsList = new ArrayList<>();
-                int totalErrors = 0;
-                int totalWarnings = 0;
+                        Set<VirtualFile> processedFiles = new HashSet<>();
 
-                // Get all source roots and scan for problems
-                VirtualFile[] contentRoots = com.intellij.openapi.roots.ProjectRootManager
-                        .getInstance(project).getContentSourceRoots();
+                        for (VirtualFile root : contentRoots) {
+                            VfsUtilCore.visitChildrenRecursively(root, new VirtualFileVisitor<Void>() {
+                                @Override
+                                public boolean visitFile(@NotNull VirtualFile file) {
+                                    if (!file.isDirectory() && isSourceFile(project, file) && !processedFiles.contains(file)) {
+                                        processedFiles.add(file);
 
-                Set<VirtualFile> processedFiles = new HashSet<>();
-
-                for (VirtualFile root : contentRoots) {
-                    VfsUtilCore.visitChildrenRecursively(root, new VirtualFileVisitor<Void>() {
-                        @Override
-                        public boolean visitFile(@NotNull VirtualFile file) {
-                            if (!file.isDirectory() && isSourceFile(project, file) && !processedFiles.contains(file)) {
-                                processedFiles.add(file);
-
-                                if (problemSolver.isProblemFile(file)) {
-                                    FileDiagnostics fileDiag = getFileDiagnostics(project, file, errorsOnly);
-                                    if (fileDiag != null && !fileDiag.diagnostics().isEmpty()) {
-                                        fileDiagnosticsList.add(fileDiag);
+                                        if (problemSolver.isProblemFile(file)) {
+                                            FileDiagnostics fileDiag = getFileDiagnostics(project, file, errorsOnly);
+                                            if (fileDiag != null && !fileDiag.diagnostics().isEmpty()) {
+                                                fileDiagnosticsList.add(fileDiag);
+                                            }
+                                        }
                                     }
+                                    return true;
+                                }
+                            });
+                        }
+
+                        // Calculate totals
+                        for (FileDiagnostics fd : fileDiagnosticsList) {
+                            for (DiagnosticInfo d : fd.diagnostics()) {
+                                if ("error".equals(d.severity())) {
+                                    totalErrors++;
+                                } else {
+                                    totalWarnings++;
                                 }
                             }
-                            return true;
                         }
-                    });
-                }
 
-                // Calculate totals
-                for (FileDiagnostics fd : fileDiagnosticsList) {
-                    for (DiagnosticInfo d : fd.diagnostics()) {
-                        if ("error".equals(d.severity())) {
-                            totalErrors++;
-                        } else {
-                            totalWarnings++;
-                        }
+                        return successResult(new GetDiagnosticsResponse(
+                                totalErrors,
+                                totalWarnings,
+                                fileDiagnosticsList
+                        ));
+
+                    } catch (Exception e) {
+                        LOG.error("Error in get_diagnostics tool", e);
+                        return errorResult("Error: " + e.getMessage());
                     }
-                }
-
-                return successResult(new GetDiagnosticsResponse(
-                        totalErrors,
-                        totalWarnings,
-                        fileDiagnosticsList
-                ));
-
-            } catch (Exception e) {
-                LOG.error("Error in get_diagnostics tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private boolean isSourceFile(Project project, VirtualFile file) {

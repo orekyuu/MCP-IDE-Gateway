@@ -7,6 +7,8 @@ import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ClassInheritorsSearch;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.tools.validator.Arg;
+import net.orekyuu.intellijmcp.tools.validator.Args;
 
 import java.util.*;
 
@@ -18,6 +20,12 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
 
     private static final Logger LOG = Logger.getInstance(GetTypeHierarchyTool.class);
     private static final int MAX_SUBCLASSES = 50;
+
+    private static final Arg<String> CLASS_NAME =
+            Arg.string("className", "The class name to get hierarchy for (simple name or fully qualified name)").required();
+    private static final Arg<Project> PROJECT = Arg.project();
+    private static final Arg<Boolean> INCLUDE_SUBCLASSES =
+            Arg.bool("includeSubclasses", "Whether to include subclasses/implementors").optional(true);
 
     @Override
     public String getName() {
@@ -31,54 +39,33 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
 
     @Override
     public McpSchema.JsonSchema getInputSchema() {
-        return JsonSchemaBuilder.object()
-                .requiredString("className", "The class name to get hierarchy for (simple name or fully qualified name)")
-                .requiredString("projectPath", "Absolute path to the project root directory")
-                .optionalBoolean("includeSubclasses", "Whether to include subclasses/implementors (default: true)")
-                .build();
+        return Args.schema(CLASS_NAME, PROJECT, INCLUDE_SUBCLASSES);
     }
 
     @Override
     public Result<ErrorResponse, TypeHierarchyResponse> execute(Map<String, Object> arguments) {
-        return runReadActionWithResult(() -> {
-            try {
-                // Get arguments
-                String className;
-                String projectPath;
-                try {
-                    className = getRequiredStringArg(arguments, "className");
-                    projectPath = getRequiredStringArg(arguments, "projectPath");
-                } catch (IllegalArgumentException e) {
-                    return errorResult("Error: " + e.getMessage());
-                }
+        return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_SUBCLASSES)
+                .mapN((className, project, includeSubclasses) -> runReadActionWithResult(() -> {
+                    try {
+                        // Find the class
+                        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+                        PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
 
-                boolean includeSubclasses = getBooleanArg(arguments, "includeSubclasses").orElse(true);
+                        if (psiClass == null) {
+                            return errorResult("Error: Class not found: " + className);
+                        }
 
-                // Find project
-                Optional<Project> projectOpt = findProjectByPath(projectPath);
-                if (projectOpt.isEmpty()) {
-                    return errorResult("Error: Project not found at path: " + projectPath);
-                }
-                Project project = projectOpt.get();
+                        // Build hierarchy
+                        TypeHierarchy hierarchy = buildTypeHierarchy(psiClass, scope, includeSubclasses);
 
-                // Find the class
-                GlobalSearchScope scope = GlobalSearchScope.allScope(project);
-                PsiClass psiClass = PsiElementResolver.findClass(project, className, scope);
+                        return successResult(new TypeHierarchyResponse(hierarchy));
 
-                if (psiClass == null) {
-                    return errorResult("Error: Class not found: " + className);
-                }
-
-                // Build hierarchy
-                TypeHierarchy hierarchy = buildTypeHierarchy(psiClass, scope, includeSubclasses);
-
-                return successResult(new TypeHierarchyResponse(hierarchy));
-
-            } catch (Exception e) {
-                LOG.error("Error in get_type_hierarchy tool", e);
-                return errorResult("Error: " + e.getMessage());
-            }
-        });
+                    } catch (Exception e) {
+                        LOG.error("Error in get_type_hierarchy tool", e);
+                        return errorResult("Error: " + e.getMessage());
+                    }
+                }))
+                .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
     private TypeHierarchy buildTypeHierarchy(PsiClass psiClass, GlobalSearchScope scope, boolean includeSubclasses) {
