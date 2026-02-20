@@ -15,7 +15,7 @@ import java.util.*;
  * MCP tool that returns the structure of a class.
  * Shows fields, methods, constructors, and inner classes.
  */
-public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool.ClassStructureResponse> {
+public class GetClassStructureTool extends AbstractProjectMcpTool<GetClassStructureTool.ClassStructureResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetClassStructureTool.class);
 
@@ -41,7 +41,7 @@ public class GetClassStructureTool extends AbstractMcpTool<GetClassStructureTool
     }
 
     @Override
-    public Result<ErrorResponse, ClassStructureResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, ClassStructureResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_INHERITED)
                 .mapN((className, project, includeInherited) -> runReadActionWithResult(() -> {
                     try {

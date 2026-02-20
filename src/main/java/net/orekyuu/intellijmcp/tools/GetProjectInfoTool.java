@@ -16,7 +16,7 @@ import java.util.*;
 /**
  * MCP tool that returns project structure information including modules, SDKs, source roots, and dependencies.
  */
-public class GetProjectInfoTool extends AbstractMcpTool<GetProjectInfoTool.GetProjectInfoResponse> {
+public class GetProjectInfoTool extends AbstractProjectMcpTool<GetProjectInfoTool.GetProjectInfoResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetProjectInfoTool.class);
 
@@ -38,7 +38,7 @@ public class GetProjectInfoTool extends AbstractMcpTool<GetProjectInfoTool.GetPr
     }
 
     @Override
-    public Result<ErrorResponse, GetProjectInfoResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, GetProjectInfoResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PROJECT)
                 .mapN(project -> runReadActionWithResult(() -> {
                     try {

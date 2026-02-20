@@ -19,7 +19,7 @@ import java.util.*;
  * Returns callers of the specified method using ReferencesSearch.
  * Uses ReadAction.nonBlocking() for better performance on large projects.
  */
-public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHierarchyResponse> {
+public class CallHierarchyTool extends AbstractProjectMcpTool<CallHierarchyTool.CallHierarchyResponse> {
 
     private static final Logger LOG = Logger.getInstance(CallHierarchyTool.class);
 
@@ -47,7 +47,7 @@ public class CallHierarchyTool extends AbstractMcpTool<CallHierarchyTool.CallHie
     }
 
     @Override
-    public Result<ErrorResponse, CallHierarchyResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, CallHierarchyResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT, DEPTH)
                 .mapN((className, memberName, project, depth) -> {
                     try {

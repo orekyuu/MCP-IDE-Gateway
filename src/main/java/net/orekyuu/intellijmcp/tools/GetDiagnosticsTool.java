@@ -24,7 +24,7 @@ import java.util.*;
 /**
  * MCP tool that retrieves all diagnostics (errors and warnings) in the project.
  */
-public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDiagnosticsResponse> {
+public class GetDiagnosticsTool extends AbstractProjectMcpTool<GetDiagnosticsTool.GetDiagnosticsResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDiagnosticsTool.class);
 
@@ -48,7 +48,7 @@ public class GetDiagnosticsTool extends AbstractMcpTool<GetDiagnosticsTool.GetDi
     }
 
     @Override
-    public Result<ErrorResponse, GetDiagnosticsResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, GetDiagnosticsResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PROJECT, ERRORS_ONLY)
                 .mapN((project, errorsOnly) -> runReadActionWithResult(() -> {
                     try {

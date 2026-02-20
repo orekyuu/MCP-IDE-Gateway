@@ -17,7 +17,7 @@ import java.util.*;
 /**
  * MCP tool that retrieves documentation for a symbol.
  */
-public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.DocumentationResponse> {
+public class GetDocumentationTool extends AbstractProjectMcpTool<GetDocumentationTool.DocumentationResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDocumentationTool.class);
     private static final Arg<String> SYMBOL_NAME = Arg.string("symbolName", "The symbol name to get documentation for (class name, or class.method/field)").required();
@@ -39,7 +39,7 @@ public class GetDocumentationTool extends AbstractMcpTool<GetDocumentationTool.D
     }
 
     @Override
-    public Result<ErrorResponse, DocumentationResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, DocumentationResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, SYMBOL_NAME, PROJECT)
                 .mapN((symbolName, project) -> runReadActionWithResult(() -> {
                     try {

@@ -17,7 +17,7 @@ import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 import java.nio.file.Path;
 import java.util.*;
 
-public class ListTestConfigurationsTool extends AbstractMcpTool<Object> {
+public class ListTestConfigurationsTool extends AbstractProjectMcpTool<Object> {
 
     private static final Arg<ProjectRelativePath> FILE_PATH =
             Arg.projectRelativePath("filePath", "Relative path to the test file from the project root");
@@ -39,7 +39,7 @@ public class ListTestConfigurationsTool extends AbstractMcpTool<Object> {
     }
 
     @Override
-    public Result<ErrorResponse, Object> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, Object> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, PROJECT)
                 .mapN((filePath, project) -> {
                     try {

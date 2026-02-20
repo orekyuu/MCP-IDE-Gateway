@@ -18,7 +18,7 @@ import java.util.*;
  * MCP tool that finds all usages of a symbol by class name and optional member name.
  * Returns the list of locations where the symbol is referenced.
  */
-public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesResponse> {
+public class FindUsagesTool extends AbstractProjectMcpTool<FindUsagesTool.FindUsagesResponse> {
 
     private static final Logger LOG = Logger.getInstance(FindUsagesTool.class);
     private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
@@ -41,7 +41,7 @@ public class FindUsagesTool extends AbstractMcpTool<FindUsagesTool.FindUsagesRes
     }
 
     @Override
-    public Result<ErrorResponse, FindUsagesResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, FindUsagesResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT)
                 .mapN((className, memberName, project) -> {
                     try {

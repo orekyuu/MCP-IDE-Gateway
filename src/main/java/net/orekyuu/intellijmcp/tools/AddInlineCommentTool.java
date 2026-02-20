@@ -17,7 +17,7 @@ import java.util.Map;
  * MCP tool that adds an inline comment to a file in the IDE editor.
  * The comment is displayed as a block inlay below the specified line.
  */
-public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.AddInlineCommentResponse> {
+public class AddInlineCommentTool extends AbstractProjectMcpTool<AddInlineCommentTool.AddInlineCommentResponse> {
 
     private static final Arg<ProjectRelativePath> FILE_PATH =
             Arg.projectRelativePath("filePath", "Relative path to the file to add a comment to");
@@ -43,7 +43,7 @@ public class AddInlineCommentTool extends AbstractMcpTool<AddInlineCommentTool.A
     }
 
     @Override
-    public Result<ErrorResponse, AddInlineCommentResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, AddInlineCommentResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, LINE, COMMENT, PROJECT)
                 .mapN((filePath, line, comment, project) -> {
                     try {

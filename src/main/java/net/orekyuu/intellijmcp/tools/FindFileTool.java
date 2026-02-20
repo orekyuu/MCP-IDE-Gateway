@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * MCP tool that searches for files by name in a project.
  * Supports exact matching and glob patterns (*, ?).
  */
-public class FindFileTool extends AbstractMcpTool<FindFileTool.FindFileResponse> {
+public class FindFileTool extends AbstractProjectMcpTool<FindFileTool.FindFileResponse> {
 
     private static final Logger LOG = Logger.getInstance(FindFileTool.class);
 
@@ -48,7 +48,7 @@ public class FindFileTool extends AbstractMcpTool<FindFileTool.FindFileResponse>
     }
 
     @Override
-    public Result<ErrorResponse, FindFileResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, FindFileResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PROJECT, FILE_NAME, INCLUDE_LIBRARIES, MAX_RESULTS)
                 .mapN((project, fileName, includeLibraries, maxResults) -> {
                     try {

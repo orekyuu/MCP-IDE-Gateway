@@ -16,7 +16,7 @@ import java.util.*;
 /**
  * MCP tool that finds all implementations of an interface or subclasses of a class.
  */
-public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTool.GetImplementationsResponse> {
+public class GetImplementationsTool extends AbstractProjectMcpTool<GetImplementationsTool.GetImplementationsResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetImplementationsTool.class);
 
@@ -42,7 +42,7 @@ public class GetImplementationsTool extends AbstractMcpTool<GetImplementationsTo
     }
 
     @Override
-    public Result<ErrorResponse, GetImplementationsResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, GetImplementationsResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_ABSTRACT)
                 .mapN((className, project, includeAbstract) -> {
                     try {

@@ -15,7 +15,7 @@ import java.util.Optional;
  * MCP tool that retrieves the definition location of a symbol by class name and optional member name.
  * Returns the file path, line range, and symbol information where the symbol is defined.
  */
-public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefinitionResponse> {
+public class GetDefinitionTool extends AbstractProjectMcpTool<GetDefinitionTool.GetDefinitionResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDefinitionTool.class);
     private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
@@ -38,7 +38,7 @@ public class GetDefinitionTool extends AbstractMcpTool<GetDefinitionTool.GetDefi
     }
 
     @Override
-    public Result<ErrorResponse, GetDefinitionResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, GetDefinitionResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, PROJECT)
                 .mapN((className, memberName, project) -> runReadActionWithResult(() -> {
                     try {

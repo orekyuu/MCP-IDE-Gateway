@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class RunTestTool extends AbstractMcpTool<Object> {
+public class RunTestTool extends AbstractProjectMcpTool<Object> {
 
     private static final Logger LOG = Logger.getInstance(RunTestTool.class);
     private static final int DEFAULT_TIMEOUT_SECONDS = 60;
@@ -60,7 +60,7 @@ public class RunTestTool extends AbstractMcpTool<Object> {
     }
 
     @Override
-    public Result<ErrorResponse, Object> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, Object> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, TEST_NAME, CONFIGURATION_NAME, TIMEOUT_SECONDS, PROJECT)
                 .mapN((filePath, testName, configurationName, timeoutSeconds, project) -> {
                     try {

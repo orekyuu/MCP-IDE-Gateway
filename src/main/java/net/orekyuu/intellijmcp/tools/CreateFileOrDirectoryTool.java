@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-public class CreateFileOrDirectoryTool extends AbstractMcpTool<CreateFileOrDirectoryTool.CreateResponse> {
+public class CreateFileOrDirectoryTool extends AbstractProjectMcpTool<CreateFileOrDirectoryTool.CreateResponse> {
 
     private static final Logger LOG = Logger.getInstance(CreateFileOrDirectoryTool.class);
 
@@ -49,7 +49,7 @@ public class CreateFileOrDirectoryTool extends AbstractMcpTool<CreateFileOrDirec
     }
 
     @Override
-    public Result<ErrorResponse, CreateResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, CreateResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PATH, IS_DIRECTORY, CONTENT, CREATE_PARENTS, OVERWRITE, PROJECT)
                 .mapN((path, isDirectory, content, createParents, overwrite, project) -> {
                     try {

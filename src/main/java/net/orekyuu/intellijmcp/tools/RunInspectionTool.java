@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * MCP tool that runs IntelliJ inspections on a file or project.
  * Supports LocalInspectionTool, GlobalSimpleInspectionTool, and GlobalInspectionTool.
  */
-public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.InspectionResponse> {
+public class RunInspectionTool extends AbstractProjectMcpTool<RunInspectionTool.InspectionResponse> {
 
     private static final Logger LOG = Logger.getInstance(RunInspectionTool.class);
 
@@ -79,7 +79,7 @@ public class RunInspectionTool extends AbstractMcpTool<RunInspectionTool.Inspect
 
     @Override
     @SuppressWarnings("resource") // ScheduledExecutorService is properly shutdown in finally block
-    public Result<ErrorResponse, InspectionResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, InspectionResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PROJECT, FILE_PATH, INSPECTION_NAMES, MIN_SEVERITY, MAX_PROBLEMS, TIMEOUT)
                 .mapN((project, filePathOpt, inspectionNames, minSeverity, maxProblems, timeoutSeconds) -> {
                     try {

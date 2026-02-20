@@ -16,7 +16,7 @@ import java.util.*;
  * MCP tool that returns the type hierarchy of a class.
  * Shows superclasses, interfaces, and subclasses/implementors.
  */
-public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.TypeHierarchyResponse> {
+public class GetTypeHierarchyTool extends AbstractProjectMcpTool<GetTypeHierarchyTool.TypeHierarchyResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetTypeHierarchyTool.class);
     private static final int MAX_SUBCLASSES = 50;
@@ -43,7 +43,7 @@ public class GetTypeHierarchyTool extends AbstractMcpTool<GetTypeHierarchyTool.T
     }
 
     @Override
-    public Result<ErrorResponse, TypeHierarchyResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, TypeHierarchyResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_SUBCLASSES)
                 .mapN((className, project, includeSubclasses) -> runReadActionWithResult(() -> {
                     try {

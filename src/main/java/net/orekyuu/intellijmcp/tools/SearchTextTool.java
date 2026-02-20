@@ -27,7 +27,7 @@ import java.util.regex.PatternSyntaxException;
  * MCP tool that searches for text in project files.
  * Supports regular expressions and case-sensitive matching.
  */
-public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextResponse> {
+public class SearchTextTool extends AbstractProjectMcpTool<SearchTextTool.SearchTextResponse> {
 
     private static final Logger LOG = Logger.getInstance(SearchTextTool.class);
     private static final int MAX_RESULTS = 100;
@@ -60,7 +60,7 @@ public class SearchTextTool extends AbstractMcpTool<SearchTextTool.SearchTextRes
     }
 
     @Override
-    public Result<ErrorResponse, SearchTextResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, SearchTextResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, SEARCH_TEXT, PROJECT, USE_REGEX, CASE_SENSITIVE, FILE_PATTERN, MAX_RESULTS_ARG)
                 .mapN((searchText, project, useRegex, caseSensitive, filePatternOpt, maxResults) -> {
                     try {

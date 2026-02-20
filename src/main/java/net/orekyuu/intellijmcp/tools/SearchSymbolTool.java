@@ -15,7 +15,7 @@ import java.util.*;
 /**
  * MCP tool that searches for symbols (methods, fields, classes) by name.
  */
-public class SearchSymbolTool extends AbstractMcpTool<SearchSymbolTool.SearchSymbolResponse> {
+public class SearchSymbolTool extends AbstractProjectMcpTool<SearchSymbolTool.SearchSymbolResponse> {
 
     private static final Logger LOG = Logger.getInstance(SearchSymbolTool.class);
     private static final int MAX_RESULTS = 50;
@@ -46,7 +46,7 @@ public class SearchSymbolTool extends AbstractMcpTool<SearchSymbolTool.SearchSym
     }
 
     @Override
-    public Result<ErrorResponse, SearchSymbolResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, SearchSymbolResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, QUERY, PROJECT, SYMBOL_TYPE)
                 .mapN((query, project, symbolType) -> runReadActionWithResult(() -> {
                     try {

@@ -19,7 +19,7 @@ import java.util.Optional;
  * MCP tool that reads the content of a file by its path relative to the project root.
  * Supports optional line range specification (1-based).
  */
-public class ReadFileTool extends AbstractMcpTool<ReadFileTool.ReadFileResponse> {
+public class ReadFileTool extends AbstractProjectMcpTool<ReadFileTool.ReadFileResponse> {
 
     private static final Logger LOG = Logger.getInstance(ReadFileTool.class);
 
@@ -47,7 +47,7 @@ public class ReadFileTool extends AbstractMcpTool<ReadFileTool.ReadFileResponse>
     }
 
     @Override
-    public Result<ErrorResponse, ReadFileResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, ReadFileResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, PROJECT, START_LINE, END_LINE)
                 .mapN((filePath, project, startLineOpt, endLineOpt) -> {
                     try {

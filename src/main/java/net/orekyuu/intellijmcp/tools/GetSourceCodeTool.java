@@ -15,7 +15,7 @@ import java.util.Optional;
  * MCP tool that retrieves the source code of a class or its member.
  * Returns the actual source code text along with file location information.
  */
-public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSourceCodeResponse> {
+public class GetSourceCodeTool extends AbstractProjectMcpTool<GetSourceCodeTool.GetSourceCodeResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetSourceCodeTool.class);
     private static final Arg<Project> PROJECT = Arg.project();
@@ -38,7 +38,7 @@ public class GetSourceCodeTool extends AbstractMcpTool<GetSourceCodeTool.GetSour
     }
 
     @Override
-    public Result<ErrorResponse, GetSourceCodeResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, GetSourceCodeResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PROJECT, CLASS_NAME, MEMBER_NAME)
                 .mapN((project, className, memberName) -> runReadActionWithResult(() -> {
                     try {

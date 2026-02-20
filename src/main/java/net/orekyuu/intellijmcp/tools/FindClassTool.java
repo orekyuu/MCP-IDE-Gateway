@@ -19,7 +19,7 @@ import java.util.*;
  * MCP tool that finds classes by name in the project.
  * Supports both simple class names and fully qualified names.
  */
-public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassResponse> {
+public class FindClassTool extends AbstractProjectMcpTool<FindClassTool.FindClassResponse> {
 
     private static final Logger LOG = Logger.getInstance(FindClassTool.class);
 
@@ -45,7 +45,7 @@ public class FindClassTool extends AbstractMcpTool<FindClassTool.FindClassRespon
     }
 
     @Override
-    public Result<ErrorResponse, FindClassResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, FindClassResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, PROJECT, INCLUDE_LIBRARIES)
                 .mapN((className, project, includeLibraries) -> runReadActionWithResult(() -> {
                     try {

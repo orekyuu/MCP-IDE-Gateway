@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * MCP tool that extracts selected code into a new method.
  */
-public class ExtractMethodTool extends AbstractMcpTool<ExtractMethodTool.ExtractMethodResponse> {
+public class ExtractMethodTool extends AbstractProjectMcpTool<ExtractMethodTool.ExtractMethodResponse> {
 
     private static final Logger LOG = Logger.getInstance(ExtractMethodTool.class);
 
@@ -58,7 +58,7 @@ public class ExtractMethodTool extends AbstractMcpTool<ExtractMethodTool.Extract
     }
 
     @Override
-    public Result<ErrorResponse, ExtractMethodResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, ExtractMethodResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, START_LINE, END_LINE, METHOD_NAME, PROJECT)
                 .mapN((filePath, startLine, endLine, methodName, project) -> {
                     try {

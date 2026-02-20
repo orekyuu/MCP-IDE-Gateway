@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-public class DeleteFileOrDirectoryTool extends AbstractMcpTool<DeleteFileOrDirectoryTool.DeleteResponse> {
+public class DeleteFileOrDirectoryTool extends AbstractProjectMcpTool<DeleteFileOrDirectoryTool.DeleteResponse> {
 
     private static final Logger LOG = Logger.getInstance(DeleteFileOrDirectoryTool.class);
 
@@ -42,7 +42,7 @@ public class DeleteFileOrDirectoryTool extends AbstractMcpTool<DeleteFileOrDirec
     }
 
     @Override
-    public Result<ErrorResponse, DeleteResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, DeleteResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, PATH, PROJECT, RECURSIVE)
                 .mapN((path, project, recursive) -> {
                     try {

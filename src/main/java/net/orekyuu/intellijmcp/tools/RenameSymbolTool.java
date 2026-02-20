@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * MCP tool that renames a symbol (class, method, field) by class name and optional member name.
  */
-public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSymbolResponse> {
+public class RenameSymbolTool extends AbstractProjectMcpTool<RenameSymbolTool.RenameSymbolResponse> {
 
     private static final Logger LOG = Logger.getInstance(RenameSymbolTool.class);
     private static final Arg<String> CLASS_NAME = Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
@@ -42,7 +42,7 @@ public class RenameSymbolTool extends AbstractMcpTool<RenameSymbolTool.RenameSym
     }
 
     @Override
-    public Result<ErrorResponse, RenameSymbolResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, RenameSymbolResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, CLASS_NAME, MEMBER_NAME, NEW_NAME, PROJECT)
                 .mapN((className, memberName, newName, project) -> {
                     try {

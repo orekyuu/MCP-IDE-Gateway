@@ -308,7 +308,8 @@ class ArgTest {
         void resolvesCombinedPath() {
             ProjectRelativePath rel = new ProjectRelativePath("src/Main.java");
             var resolved = rel.resolve("/project/root");
-            assertThat(resolved.toString()).isEqualTo("/project/root/src/Main.java");
+            // Normalize separators to make assertion OS-independent
+            assertThat(resolved.toString().replace('\\','/')).isEqualTo("/project/root/src/Main.java");
         }
     }
 

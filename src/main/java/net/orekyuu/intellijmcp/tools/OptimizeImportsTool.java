@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * MCP tool that optimizes imports in a file.
  */
-public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.OptimizeImportsResponse> {
+public class OptimizeImportsTool extends AbstractProjectMcpTool<OptimizeImportsTool.OptimizeImportsResponse> {
 
     private static final Logger LOG = Logger.getInstance(OptimizeImportsTool.class);
 
@@ -46,7 +46,7 @@ public class OptimizeImportsTool extends AbstractMcpTool<OptimizeImportsTool.Opt
     }
 
     @Override
-    public Result<ErrorResponse, OptimizeImportsResponse> execute(Map<String, Object> arguments) {
+    public Result<ErrorResponse, OptimizeImportsResponse> doExecute(Map<String, Object> arguments) {
         return Args.validate(arguments, FILE_PATH, PROJECT)
                 .mapN((filePath, project) -> {
                     try {
