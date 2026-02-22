@@ -24,6 +24,7 @@ dependencies {
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
         testBundledPlugin("com.intellij.gradle")
         testBundledPlugin("JUnit")
+        testBundledPlugin("com.intellij.modules.json")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Plugin.ExternalSystem)
     }
 
