@@ -120,9 +120,9 @@ Read the content of a file by its absolute path. Supports optional line range.
 
 ---
 
-### get_project_info
+### get_project_modules
 
-Get project structure information including modules, SDKs, source roots, and dependencies.
+List modules in a project with their type and source/resource roots.
 
 **Parameters:**
 
@@ -134,33 +134,44 @@ Get project structure information including modules, SDKs, source roots, and dep
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `projectName` | `string` | Project name |
-| `modules` | `ModuleInfo[]` | List of modules in the project |
+| `modules` | `ModuleInfo[]` | Module list |
 
 `ModuleInfo`:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Module name |
-| `sdk` | `SdkInfo` | SDK information |
-| `sourceRoots` | `SourceRootInfo[]` | Source roots |
-| `moduleDependencies` | `string[]` | Module dependency names |
-| `libraries` | `string[]` | Library dependency names |
+| `path` | `string` | Module directory (relative to project) |
+| `type` | `string` | Module type ID |
+| `sourceFolders` | `string[]` | Relative paths of source folders |
+| `resourceFolders` | `string[]` | Relative paths of resource folders |
+| `testSourceFolders` | `string[]` | Relative paths of test source folders |
+| `testResourceFolders` | `string[]` | Relative paths of test resource folders |
 
-`SdkInfo`:
+---
+
+### get_project_dependencies
+
+List module and library dependencies for a project or a single module.
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `projectPath` | Yes | Absolute path to the project root directory |
+| `moduleName` | No | Module name to filter dependencies |
+
+**Response:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | `string` | SDK name |
-| `version` | `string` | SDK version |
-| `type` | `string` | SDK type (e.g., `"JavaSDK"`) |
+| `dependencies` | `DependencyInfo[]` | Dependency entries |
 
-`SourceRootInfo`:
+`DependencyInfo`:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `path` | `string` | Relative path from project root |
-| `type` | `string` | `"source"`, `"test-source"`, `"resource"`, or `"test-resource"` |
+| `name` | `string` | Dependency name |
 
 ---
 
