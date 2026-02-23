@@ -53,12 +53,18 @@ public abstract class AbstractProjectMcpTool<R> extends AbstractMcpTool<R> {
             return false;
         }).toList();
 
-        ApplicationManager.getApplication().runWriteAction(() -> {
+        var app = ApplicationManager.getApplication();
+        Runnable syncTask = () -> app.runWriteAction(() -> {
             LocalFileSystem.getInstance().refreshFiles(dirtyFiles, false, true, null);
             PsiDocumentManager.getInstance(project).commitAllDocuments();
         });
+        if (app.isDispatchThread()) {
+            syncTask.run();
+        } else {
+            app.invokeAndWait(syncTask);
+        }
 
-        if (!ApplicationManager.getApplication().isDispatchThread()) {
+        if (!app.isDispatchThread()) {
             dumbService.waitForSmartMode();
         }
     }
