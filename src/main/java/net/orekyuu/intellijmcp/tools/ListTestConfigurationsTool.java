@@ -25,7 +25,7 @@ public class ListTestConfigurationsTool extends AbstractProjectMcpTool<Object> {
 
     @Override
     public String getDescription() {
-        return "List available test configurations for a file. Returns configurations for the whole file and for each individual test name found in the file.";
+        return "List available test run configurations for a test file. Call this before run_test when you are unsure which configuration to use or when run_test fails due to ambiguous configurations.";
     }
 
     @Override

@@ -27,7 +27,7 @@ public class OpenFileTool extends AbstractMcpTool<OpenFileTool.OpenFileResponse>
 
     @Override
     public String getDescription() {
-        return "Open a file in IntelliJ IDEA editor";
+        return "Open a file in the IntelliJ IDEA editor and bring it into view. Use this to navigate the user to a relevant file after finding it.";
     }
 
     @Override

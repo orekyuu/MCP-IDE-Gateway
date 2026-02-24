@@ -37,7 +37,7 @@ public class RunTestTool extends AbstractProjectMcpTool<Object> {
     private static final Arg<ProjectRelativePath> FILE_PATH =
             Arg.projectRelativePath("filePath", "Relative path to the test file from the project root");
     private static final Arg<Optional<String>> TEST_NAME =
-            Arg.string("testName", "Specific test method/function name to run. If omitted, runs all tests in the file").optional();
+            Arg.string("testName", "Specific test method name to run (e.g., 'testLogin', 'should_return_error'). If omitted, runs all tests in the file.").optional();
     private static final Arg<Optional<String>> CONFIGURATION_NAME =
             Arg.string("configurationName", "Name of the run configuration to use. Required when multiple configurations are available. Call without this parameter first to get the list of available configurations.").optional();
     private static final Arg<Integer> TIMEOUT_SECONDS =
@@ -46,7 +46,7 @@ public class RunTestTool extends AbstractProjectMcpTool<Object> {
 
     @Override
     public String getDescription() {
-        return "Run tests in a file or a specific test method using IntelliJ's test runner. Supports any language with a run configuration provider (Java, Kotlin, Python, JavaScript, etc.)";
+        return "Run tests and return results (pass/fail, error messages, stack traces). Use this to verify correctness after code changes. Supports running all tests in a file or a single test method. Call list_test_configurations first if multiple configurations exist.";
     }
 
     @Override

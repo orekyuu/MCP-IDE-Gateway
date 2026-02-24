@@ -25,11 +25,11 @@ public class GetProjectDependenciesTool extends AbstractProjectMcpTool<GetProjec
     private static final Logger LOG = Logger.getInstance(GetProjectDependenciesTool.class);
 
     private static final Arg<Project> PROJECT = Arg.project();
-    private static final Arg<Optional<String>> MODULE_NAME = Arg.string("moduleName", "Module name to filter dependencies").optional();
+    private static final Arg<Optional<String>> MODULE_NAME = Arg.string("moduleName", "Module name to get dependencies for (e.g., 'app', 'core'). If omitted, returns dependencies for all modules.").optional();
 
     @Override
     public String getDescription() {
-        return "List module and library dependencies for the entire project or a single module";
+        return "List libraries and module dependencies. Use this when asked 'what dependencies does this project use?', to check if a library is available, or to understand the build classpath.";
     }
 
     @Override

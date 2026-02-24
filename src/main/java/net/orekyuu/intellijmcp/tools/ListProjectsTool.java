@@ -21,7 +21,7 @@ public class ListProjectsTool extends AbstractMcpTool<ListProjectsTool.ListProje
 
     @Override
     public String getDescription() {
-        return "Get list of open projects in IntelliJ IDEA";
+        return "List all open IntelliJ IDEA projects with their paths and Git info. Call this first to get the projectPath required by most other tools.";
     }
 
     @Override

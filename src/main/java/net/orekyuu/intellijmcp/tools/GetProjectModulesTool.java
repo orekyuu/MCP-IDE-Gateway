@@ -32,7 +32,7 @@ public class GetProjectModulesTool extends AbstractProjectMcpTool<GetProjectModu
 
     @Override
     public String getDescription() {
-        return "List modules in a project along with their directories and source/resource roots";
+        return "List all modules in a project with their source roots, resource roots, and directories. Use this to understand project structure before creating files, or to find where source files should be placed.";
     }
 
     @Override

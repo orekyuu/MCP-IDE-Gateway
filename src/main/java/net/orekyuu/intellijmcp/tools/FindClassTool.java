@@ -24,14 +24,14 @@ public class FindClassTool extends AbstractProjectMcpTool<FindClassTool.FindClas
     private static final Logger LOG = Logger.getInstance(FindClassTool.class);
 
     private static final Arg<String> CLASS_NAME =
-            Arg.string("className", "The class name to search for (simple name or fully qualified name)").required();
+            Arg.string("className", "Simple name (e.g., 'MyClass') or fully qualified name (e.g., 'com.example.MyClass') to search for").required();
     private static final Arg<Project> PROJECT = Arg.project();
     private static final Arg<Boolean> INCLUDE_LIBRARIES =
             Arg.bool("includeLibraries", "Whether to include library classes in the search").optional(false);
 
     @Override
     public String getDescription() {
-        return "Find classes by name in the project. Supports simple names (e.g., 'MyClass') or fully qualified names (e.g., 'com.example.MyClass')";
+        return "Find classes by simple or fully-qualified name. Use this when you need to locate a class file or confirm a class exists. Returns file path and line range. Prefer this over file search when you know the class name.";
     }
 
     @Override

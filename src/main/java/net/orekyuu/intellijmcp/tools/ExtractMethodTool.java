@@ -33,7 +33,7 @@ public class ExtractMethodTool extends AbstractProjectMcpTool<ExtractMethodTool.
     private static final Logger LOG = Logger.getInstance(ExtractMethodTool.class);
 
     private static final Arg<ProjectRelativePath> FILE_PATH =
-            Arg.projectRelativePath("filePath", "Relative path to the file");
+            Arg.projectRelativePath("filePath", "Relative path from project root to the Java file (e.g., 'src/main/java/com/example/Foo.java')");
     private static final Arg<Integer> START_LINE =
             Arg.integer("startLine", "Start line of the code to extract (1-based)").min(1).required();
     private static final Arg<Integer> END_LINE =
@@ -44,7 +44,7 @@ public class ExtractMethodTool extends AbstractProjectMcpTool<ExtractMethodTool.
 
     @Override
     public String getDescription() {
-        return "Extract a range of code into a new method";
+        return "Extract a block of code into a new method. Use this when asked to refactor code, reduce duplication, or improve readability by pulling out a block of lines into a named method.";
     }
 
     @Override

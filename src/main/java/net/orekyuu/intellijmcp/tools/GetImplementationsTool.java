@@ -28,7 +28,7 @@ public class GetImplementationsTool extends AbstractProjectMcpTool<GetImplementa
 
     @Override
     public String getDescription() {
-        return "Get all implementations of an interface or subclasses of a class";
+        return "Find all concrete implementations of an interface or all subclasses of a class. Use this when asked 'what implements this interface?' or 'what extends this class?'. Returns class names and file locations.";
     }
 
     @Override

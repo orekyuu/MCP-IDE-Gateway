@@ -21,7 +21,7 @@ public class SearchSymbolTool extends AbstractProjectMcpTool<SearchSymbolTool.Se
     private static final int MAX_RESULTS = 50;
 
     private static final Arg<String> QUERY =
-            Arg.string("query", "The symbol name to search for (supports partial matching)").required();
+            Arg.string("query", "Partial or full symbol name (case-insensitive substring match). Returns up to 50 results.").required();
     private static final Arg<Project> PROJECT = Arg.project();
     public enum SymbolType {
         ALL, CLASS, METHOD, FIELD
@@ -32,7 +32,7 @@ public class SearchSymbolTool extends AbstractProjectMcpTool<SearchSymbolTool.Se
 
     @Override
     public String getDescription() {
-        return "Search for symbols (methods, fields, classes) by name in the project";
+        return "Search for methods, fields, or classes by partial name match. Use this when you know part of a symbol's name but not the exact class. Prefer find_class for exact class lookups; use this for partial/fuzzy symbol search across all symbol types.";
     }
 
     @Override

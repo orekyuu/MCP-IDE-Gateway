@@ -28,7 +28,7 @@ public class RenameSymbolTool extends AbstractProjectMcpTool<RenameSymbolTool.Re
 
     @Override
     public String getDescription() {
-        return "Rename a symbol (class, method, field) and update all references";
+        return "Safely rename a class, method, or field and update all references across the project. Use this instead of text search/replace to ensure all usages are correctly renamed. This is a refactoring operation.";
     }
 
     @Override

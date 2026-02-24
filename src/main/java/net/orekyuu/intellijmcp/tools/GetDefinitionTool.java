@@ -24,7 +24,7 @@ public class GetDefinitionTool extends AbstractProjectMcpTool<GetDefinitionTool.
 
     @Override
     public String getDescription() {
-        return "Get the definition location of a symbol by class name and optional member name";
+        return "Get the file path and line range where a class or member is defined. Use this when asked 'where is X defined?' or before reading source code to find the exact location.";
     }
 
     @Override

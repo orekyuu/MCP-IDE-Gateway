@@ -29,7 +29,7 @@ public class AddInlineCommentTool extends AbstractProjectMcpTool<AddInlineCommen
 
     @Override
     public String getDescription() {
-        return "Add an inline comment to a file in the IDE editor. The comment is displayed as a block inlay below the specified line. Supports Markdown formatting.";
+        return "Display an AI-generated comment as an inline block in the IDE editor (not a code comment). Use this to show analysis results, suggestions, or notes at specific lines so the user can see them in context. Supports Markdown.";
     }
 
     @Override

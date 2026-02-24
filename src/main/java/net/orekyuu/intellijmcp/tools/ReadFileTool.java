@@ -33,7 +33,7 @@ public class ReadFileTool extends AbstractProjectMcpTool<ReadFileTool.ReadFileRe
 
     @Override
     public String getDescription() {
-        return "Read the content of a file by its path relative to the project root. Supports optional line range.";
+        return "Read file content by project-relative path. Use this to read any file (source, config, resources) when you have the file path. Supports line range to read a specific section. Use get_source_code instead if you know the class name.";
     }
 
     @Override

@@ -29,7 +29,7 @@ public class GetTypeHierarchyTool extends AbstractProjectMcpTool<GetTypeHierarch
 
     @Override
     public String getDescription() {
-        return "Get the type hierarchy of a class including superclasses, interfaces, and subclasses/implementors";
+        return "Get the full type hierarchy of a class: its superclasses, implemented interfaces, and direct subclasses. Use this when asked 'what does this class extend?', 'what interfaces does it implement?', or to understand the class hierarchy.";
     }
 
     @Override

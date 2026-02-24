@@ -33,7 +33,7 @@ public class SearchTextTool extends AbstractProjectMcpTool<SearchTextTool.Search
     private static final int MAX_RESULTS = 100;
 
     private static final Arg<String> SEARCH_TEXT =
-            Arg.string("searchText", "The text or pattern to search for").required();
+            Arg.string("searchText", "Text or regex pattern to search for. Set useRegex=true when using regular expressions.").required();
     private static final Arg<Project> PROJECT = Arg.project();
     private static final Arg<Boolean> USE_REGEX =
             Arg.bool("useRegex", "Use regular expression matching").optional(false);
@@ -47,7 +47,7 @@ public class SearchTextTool extends AbstractProjectMcpTool<SearchTextTool.Search
 
     @Override
     public String getDescription() {
-        return "Search for text in project files. Supports regular expressions and case-sensitive matching.";
+        return "Full-text search across project files, similar to Ctrl+Shift+F. Use this to find strings, identifiers, or patterns when you don't know the class name. Supports regex and file-type filtering.";
     }
 
     @Override

@@ -27,7 +27,7 @@ public class GetClassStructureTool extends AbstractProjectMcpTool<GetClassStruct
 
     @Override
     public String getDescription() {
-        return "Get the structure of a class including fields, methods, constructors, and inner classes";
+        return "Get the full API of a class: fields, methods, constructors, and inner classes with their signatures. Use this to understand a class without reading its entire source. Prefer this over get_source_code when you need structure/API rather than implementation.";
     }
 
     @Override

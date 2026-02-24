@@ -35,7 +35,7 @@ public class CreateFileOrDirectoryTool extends AbstractProjectMcpTool<CreateFile
 
     @Override
     public String getDescription() {
-        return "Create a file or directory in the project";
+        return "Create a new file or directory at a project-relative path. Use this when asked to create new source files, configs, or directories. Can optionally set initial file content and create parent directories automatically.";
     }
 
     @Override

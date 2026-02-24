@@ -26,14 +26,14 @@ public class CallHierarchyTool extends AbstractProjectMcpTool<CallHierarchyTool.
     private static final Arg<String> CLASS_NAME =
             Arg.string("className", "Fully qualified class name (e.g., 'com.example.MyClass')").required();
     private static final Arg<String> MEMBER_NAME =
-            Arg.string("memberName", "Method name to get call hierarchy for").required();
+            Arg.string("memberName", "Name of the method to find callers for (must be a method, not a field or class)").required();
     private static final Arg<Project> PROJECT = Arg.project();
     private static final Arg<Integer> DEPTH =
             Arg.integer("depth", "Maximum depth of the hierarchy to retrieve").max(10).optional(3);
 
     @Override
     public String getDescription() {
-        return "Get call hierarchy (callers) for a method by class name and method name";
+        return "Find all callers of a method recursively. Use this when asked 'who calls this method?', to understand the impact of changing a method, or to trace execution paths. Returns caller method names, classes, and file locations.";
     }
 
     @Override

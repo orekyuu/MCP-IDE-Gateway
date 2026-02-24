@@ -62,7 +62,7 @@ public record Arg<T>(
 
     public static Arg<Project> project() {
         String key = "projectPath";
-        return new Arg<>(key, "Absolute path to the project root directory", true, null, SchemaType.STRING, args -> {
+        return new Arg<>(key, "Absolute path to the project root directory. Get this value from list_projects if unknown.", true, null, SchemaType.STRING, args -> {
             Object value = args.get(key);
             if (value == null || value.toString().isBlank()) {
                 return new Validated.Invalid<>(key, key + " is required");

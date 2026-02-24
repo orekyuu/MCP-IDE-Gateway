@@ -34,7 +34,7 @@ public class FindFileTool extends AbstractProjectMcpTool<FindFileTool.FindFileRe
 
     @Override
     public String getDescription() {
-        return "Search for files by name in a project. Supports glob patterns (* and ?) for flexible matching.";
+        return "Find files by name or glob pattern. Use this when you need a file path but only know the file name or a partial name pattern (e.g., '*.xml', 'Test*.java'). Returns file paths and metadata.";
     }
 
     @Override

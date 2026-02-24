@@ -24,7 +24,7 @@ public class GetSourceCodeTool extends AbstractProjectMcpTool<GetSourceCodeTool.
 
     @Override
     public String getDescription() {
-        return "Get the source code of a class or a specific member (method/field) by class name";
+        return "Get the source code of a class or a specific method/field by class name. Use this when you need to read implementation details. Prefer this over read_file when you know the class name rather than the file path.";
     }
 
     @Override

@@ -27,7 +27,7 @@ public class FindUsagesTool extends AbstractProjectMcpTool<FindUsagesTool.FindUs
 
     @Override
     public String getDescription() {
-        return "Find all usages of a symbol by class name and optional member name";
+        return "Find all places a class or member is used/called in the project. Use this when asked 'where is X used?', 'what calls this?', or when assessing the impact of changing a symbol. Returns file paths, line numbers, and code snippets.";
     }
 
     @Override

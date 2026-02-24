@@ -28,7 +28,7 @@ public class DeleteFileOrDirectoryTool extends AbstractProjectMcpTool<DeleteFile
 
     @Override
     public String getDescription() {
-        return "Delete a file or directory in the project";
+        return "Delete a file or directory at a project-relative path. Use recursive=true to delete non-empty directories. This operation is permanent.";
     }
 
     @Override

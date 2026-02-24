@@ -20,12 +20,12 @@ import java.util.*;
 public class GetDocumentationTool extends AbstractProjectMcpTool<GetDocumentationTool.DocumentationResponse> {
 
     private static final Logger LOG = Logger.getInstance(GetDocumentationTool.class);
-    private static final Arg<String> SYMBOL_NAME = Arg.string("symbolName", "The symbol name to get documentation for (class name, or class.method/field)").required();
+    private static final Arg<String> SYMBOL_NAME = Arg.string("symbolName", "Fully qualified class name (e.g., 'java.util.List'), or 'ClassName#memberName' for a member (e.g., 'java.util.List#add')").required();
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
     public String getDescription() {
-        return "Get the documentation of a class, method, or field";
+        return "Get the Javadoc/documentation comment for a class, method, or field. Use this when asked about the documented purpose or API contract of a symbol.";
     }
 
     @Override

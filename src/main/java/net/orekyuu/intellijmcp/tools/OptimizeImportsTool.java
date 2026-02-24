@@ -32,7 +32,7 @@ public class OptimizeImportsTool extends AbstractProjectMcpTool<OptimizeImportsT
 
     @Override
     public String getDescription() {
-        return "Optimize imports in a file (remove unused imports and organize)";
+        return "Remove unused imports and organize import statements in a file. Call this after editing Java/Kotlin files to clean up imports, or when the user asks to fix 'unused import' warnings.";
     }
 
     @Override

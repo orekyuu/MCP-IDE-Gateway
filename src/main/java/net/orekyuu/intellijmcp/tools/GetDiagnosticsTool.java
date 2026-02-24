@@ -34,7 +34,7 @@ public class GetDiagnosticsTool extends AbstractProjectMcpTool<GetDiagnosticsToo
 
     @Override
     public String getDescription() {
-        return "Get all diagnostics (errors and warnings) in the project";
+        return "Get compile errors and warnings in the project. Use this to verify correctness after making code changes, or when asked 'are there any errors?'. Returns file paths, line numbers, severity, and error messages.";
     }
 
     @Override

@@ -37,7 +37,7 @@ public class FileStructureTool extends AbstractMcpTool<FileStructureTool.FileStr
 
     @Override
     public String getDescription() {
-        return "Get the structure of a file (classes, methods, fields, etc.) in a language-agnostic way using IntelliJ's StructureView API. Accepts an absolute file path.";
+        return "Get the structure (classes, functions, fields) of any file in a language-agnostic way. Use this for non-Java files (Kotlin, Python, etc.) or when you have a file path instead of a class name. Prefer get_class_structure for Java classes by name.";
     }
 
     @Override

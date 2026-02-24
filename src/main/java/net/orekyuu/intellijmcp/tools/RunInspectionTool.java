@@ -56,7 +56,7 @@ public class RunInspectionTool extends AbstractProjectMcpTool<RunInspectionTool.
     }
 
     private static final Arg<Severity> MIN_SEVERITY =
-            Arg.enumArg("minSeverity", "Minimum severity level to report", Severity.class).optional(Severity.INFO);
+            Arg.enumArg("minSeverity", "Minimum severity to include. ERROR: errors only, WARNING: errors + warnings, WEAK_WARNING, INFO: all issues (default)", Severity.class).optional(Severity.INFO);
     private static final Arg<Integer> MAX_PROBLEMS =
             Arg.integer("maxProblems", "Maximum number of problems to report").optional(100);
     private static final Arg<Integer> TIMEOUT =
@@ -64,7 +64,7 @@ public class RunInspectionTool extends AbstractProjectMcpTool<RunInspectionTool.
 
     @Override
     public String getDescription() {
-        return "Run IntelliJ code inspections on a file or the entire project to find potential issues, code smells, and improvements";
+        return "Run static code analysis inspections to find bugs, code smells, and style issues. Use this when asked to review code quality, find potential bugs, or when get_diagnostics shows no errors but issues might still exist. Slower than get_diagnostics but more thorough.";
     }
 
     @Override
