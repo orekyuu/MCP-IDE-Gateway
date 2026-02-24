@@ -43,11 +43,6 @@ public class ExtractMethodTool extends AbstractProjectMcpTool<ExtractMethodTool.
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "extract_method";
-    }
-
-    @Override
     public String getDescription() {
         return "Extract a range of code into a new method";
     }

@@ -26,11 +26,6 @@ public class OpenFileTool extends AbstractMcpTool<OpenFileTool.OpenFileResponse>
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "open_file";
-    }
-
-    @Override
     public String getDescription() {
         return "Open a file in IntelliJ IDEA editor";
     }

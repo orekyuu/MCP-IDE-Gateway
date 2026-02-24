@@ -27,11 +27,6 @@ public class RenameSymbolTool extends AbstractProjectMcpTool<RenameSymbolTool.Re
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "rename_symbol";
-    }
-
-    @Override
     public String getDescription() {
         return "Rename a symbol (class, method, field) and update all references";
     }

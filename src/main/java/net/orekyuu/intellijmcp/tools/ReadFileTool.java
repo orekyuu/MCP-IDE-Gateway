@@ -32,11 +32,6 @@ public class ReadFileTool extends AbstractProjectMcpTool<ReadFileTool.ReadFileRe
             Arg.integer("endLine", "End line number (1-based, inclusive). If not specified, reads to the end.").min(1).optional();
 
     @Override
-    public String getName() {
-        return "read_file";
-    }
-
-    @Override
     public String getDescription() {
         return "Read the content of a file by its path relative to the project root. Supports optional line range.";
     }

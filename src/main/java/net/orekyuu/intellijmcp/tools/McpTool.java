@@ -1,24 +1,15 @@
 package net.orekyuu.intellijmcp.tools;
 
-import com.intellij.openapi.vfs.LocalFileSystem;
-import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
-import net.orekyuu.intellijmcp.services.McpServerLogService;
 
-import java.util.List;
 import java.util.Map;
 
 /**
  * Interface for MCP tools.
- * Each tool provides a name, description, input schema, and execution logic.
+ * Each tool provides a description, input schema, and execution logic.
+ * Tool name is declared in plugin.xml via the mcpTool extension point.
  */
 public interface McpTool<RESPONSE> {
-
-    /**
-     * Returns the unique name of the tool.
-     * This name is used to identify the tool in MCP protocol.
-     */
-    String getName();
 
     /**
      * Returns a human-readable description of what the tool does.
@@ -50,54 +41,5 @@ public interface McpTool<RESPONSE> {
       static <L, R> SuccessResponse<L, R> success(R message) {
         return new SuccessResponse<>(message);
       }
-    }
-
-    /**
-     * Converts this tool to an MCP SDK SyncToolSpecification.
-     * Default implementation builds the specification from interface methods.
-     */
-    default McpServerFeatures.SyncToolSpecification toSpecification() {
-        var tool = McpSchema.Tool.builder()
-                .name(getName())
-                .description(getDescription())
-                .inputSchema(getInputSchema())
-                .build();
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-                .tool(tool)
-                .callHandler((exchange, request) -> {
-                    Map<String, Object> arguments = request.arguments();
-                    McpServerLogService logService = McpServerLogService.getInstance();
-                    String toolName = getName();
-
-                    // Log request
-                    logService.info("Tool call: " + toolName);
-                    logService.info("  Request: " + ResponseSerializer.serialize(arguments));
-
-                    // Refresh VFS to pick up external file changes
-                    LocalFileSystem.getInstance().refresh(false);
-
-                    Result<ErrorResponse, RESPONSE> result = execute(arguments);
-
-                    // Log response
-                    return switch (result) {
-                        case Result.ErrorResponse<ErrorResponse, RESPONSE> err -> {
-                            logService.error("  Response (error): " + err.message().message());
-                            yield McpSchema.CallToolResult.builder()
-                                    .content(List.of(new McpSchema.TextContent(err.message().message())))
-                                    .isError(true)
-                                    .build();
-                        }
-                        case Result.SuccessResponse<ErrorResponse, RESPONSE> success -> {
-                            String responseBody = ResponseSerializer.serialize(success.message());
-                            logService.info("  Response: " + responseBody);
-                            yield McpSchema.CallToolResult.builder()
-                                    .content(List.of(new McpSchema.TextContent(responseBody)))
-                                    .isError(false)
-                                    .build();
-                        }
-                    };
-                })
-                .build();
     }
 }

@@ -24,11 +24,6 @@ public class GetDocumentationTool extends AbstractProjectMcpTool<GetDocumentatio
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "get_documentation";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the documentation of a class, method, or field";
     }

@@ -30,11 +30,6 @@ public class FindClassTool extends AbstractProjectMcpTool<FindClassTool.FindClas
             Arg.bool("includeLibraries", "Whether to include library classes in the search").optional(false);
 
     @Override
-    public String getName() {
-        return "find_class";
-    }
-
-    @Override
     public String getDescription() {
         return "Find classes by name in the project. Supports simple names (e.g., 'MyClass') or fully qualified names (e.g., 'com.example.MyClass')";
     }

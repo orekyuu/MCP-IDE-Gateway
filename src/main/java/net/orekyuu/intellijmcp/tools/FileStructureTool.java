@@ -36,11 +36,6 @@ public class FileStructureTool extends AbstractMcpTool<FileStructureTool.FileStr
             Arg.absolutePath("filePath", "Absolute path to the file to get the structure for");
 
     @Override
-    public String getName() {
-        return "get_file_structure";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the structure of a file (classes, methods, fields, etc.) in a language-agnostic way using IntelliJ's StructureView API. Accepts an absolute file path.";
     }

@@ -44,10 +44,6 @@ public class SearchTextTool extends AbstractProjectMcpTool<SearchTextTool.Search
     private static final Arg<Integer> MAX_RESULTS_ARG =
             Arg.integer("maxResults", "Maximum number of results to return").optional(MAX_RESULTS);
 
-    @Override
-    public String getName() {
-        return "search_text";
-    }
 
     @Override
     public String getDescription() {

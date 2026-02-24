@@ -32,11 +32,6 @@ public class CallHierarchyTool extends AbstractProjectMcpTool<CallHierarchyTool.
             Arg.integer("depth", "Maximum depth of the hierarchy to retrieve").max(10).optional(3);
 
     @Override
-    public String getName() {
-        return "get_call_hierarchy";
-    }
-
-    @Override
     public String getDescription() {
         return "Get call hierarchy (callers) for a method by class name and method name";
     }

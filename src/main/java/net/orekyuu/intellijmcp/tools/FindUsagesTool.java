@@ -26,11 +26,6 @@ public class FindUsagesTool extends AbstractProjectMcpTool<FindUsagesTool.FindUs
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "find_usages";
-    }
-
-    @Override
     public String getDescription() {
         return "Find all usages of a symbol by class name and optional member name";
     }

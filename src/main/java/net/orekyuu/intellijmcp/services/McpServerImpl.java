@@ -9,13 +9,15 @@ import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletSseServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema;
 import net.orekyuu.intellijmcp.settings.McpServerSettings;
-import net.orekyuu.intellijmcp.tools.McpToolRegistry;
+import net.orekyuu.intellijmcp.tools.McpToolBean;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * MCP Server implementation using MCP Java SDK 0.12.1 with SSE over HTTP.
@@ -77,7 +79,7 @@ public class McpServerImpl {
             LOG.info("HTTP/SSE endpoint: http://localhost:" + port);
             LOG.info("SSE endpoint: http://localhost:" + port + "/sse");
             LOG.info("Message endpoint: http://localhost:" + port + "/mcp/message");
-            LOG.info("MCP tools registered via McpToolRegistry");
+            LOG.info("MCP tools registered via Extension Point");
 
             logService().info("MCP Server initialized and started successfully");
             logService().info("HTTP/SSE endpoint: http://localhost:" + port);
@@ -118,9 +120,14 @@ public class McpServerImpl {
 
 
     private void registerTools(McpSyncServer server) {
-        McpToolRegistry registry = McpToolRegistry.createDefault();
-        registry.registerAllWithServer(server);
-        logService().info("Registered " + registry.size() + " MCP tools");
+        List<McpToolBean> beans = McpToolBean.EP_NAME.getExtensionList();
+        List<String> toolNames = new ArrayList<>();
+        for (McpToolBean bean : beans) {
+            server.addTool(bean.toSpecification());
+            toolNames.add(bean.name);
+        }
+        LOG.info("Registered MCP tools: " + String.join(", ", toolNames));
+        logService().info("Registered " + beans.size() + " MCP tools");
     }
 
     public void stop() {

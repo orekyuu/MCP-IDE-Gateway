@@ -13,11 +13,6 @@ class AbstractMcpToolTest {
     // Concrete implementation for testing
     private static class TestTool extends AbstractMcpTool<String> {
         @Override
-        public String getName() {
-            return "test_tool";
-        }
-
-        @Override
         public String getDescription() {
             return "Test tool";
         }

@@ -26,11 +26,6 @@ public class GetClassStructureTool extends AbstractProjectMcpTool<GetClassStruct
             Arg.bool("includeInherited", "Whether to include inherited members").optional(false);
 
     @Override
-    public String getName() {
-        return "get_class_structure";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the structure of a class including fields, methods, constructors, and inner classes";
     }

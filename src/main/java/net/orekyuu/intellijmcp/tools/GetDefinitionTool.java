@@ -23,11 +23,6 @@ public class GetDefinitionTool extends AbstractProjectMcpTool<GetDefinitionTool.
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "get_definition";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the definition location of a symbol by class name and optional member name";
     }

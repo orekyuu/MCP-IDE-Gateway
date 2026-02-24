@@ -33,11 +33,6 @@ public class GetDiagnosticsTool extends AbstractProjectMcpTool<GetDiagnosticsToo
             Arg.bool("errorsOnly", "Whether to return only errors, excluding warnings").optional(false);
 
     @Override
-    public String getName() {
-        return "get_diagnostics";
-    }
-
-    @Override
     public String getDescription() {
         return "Get all diagnostics (errors and warnings) in the project";
     }

@@ -36,11 +36,6 @@ abstract class BaseMcpToolTest<T extends McpTool<?>> {
     abstract T createTool();
 
     @Test
-    void testName() {
-      assertThat(tool.getName()).isNotBlank();
-    }
-
-    @Test
     void testDescription() {
       assertThat(tool.getDescription()).isNotBlank();
     }
@@ -50,15 +45,6 @@ abstract class BaseMcpToolTest<T extends McpTool<?>> {
       var schema = tool.getInputSchema();
       assertThat(schema).isNotNull();
       assertThat(schema.type()).isEqualTo("object");
-    }
-
-    @Test
-    void testToSpecification() {
-      var spec = tool.toSpecification();
-      assertThat(spec).isNotNull();
-      assertThat(spec.tool()).isNotNull();
-      assertThat(spec.tool().name()).isEqualTo(tool.getName());
-      assertThat(spec.tool().inputSchema()).isNotNull();
     }
 
     protected Project getProject() {

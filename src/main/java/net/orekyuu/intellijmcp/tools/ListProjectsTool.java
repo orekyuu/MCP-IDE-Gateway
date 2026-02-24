@@ -20,11 +20,6 @@ public class ListProjectsTool extends AbstractMcpTool<ListProjectsTool.ListProje
     private static final Logger LOG = Logger.getInstance(ListProjectsTool.class);
 
     @Override
-    public String getName() {
-        return "list_projects";
-    }
-
-    @Override
     public String getDescription() {
         return "Get list of open projects in IntelliJ IDEA";
     }

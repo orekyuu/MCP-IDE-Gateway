@@ -28,11 +28,6 @@ public class AddInlineCommentTool extends AbstractProjectMcpTool<AddInlineCommen
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "add_inline_comment";
-    }
-
-    @Override
     public String getDescription() {
         return "Add an inline comment to a file in the IDE editor. The comment is displayed as a block inlay below the specified line. Supports Markdown formatting.";
     }

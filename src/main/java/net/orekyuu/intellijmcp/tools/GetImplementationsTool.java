@@ -27,11 +27,6 @@ public class GetImplementationsTool extends AbstractProjectMcpTool<GetImplementa
             Arg.bool("includeAbstract", "Whether to include abstract classes in the results").optional(true);
 
     @Override
-    public String getName() {
-        return "get_implementations";
-    }
-
-    @Override
     public String getDescription() {
         return "Get all implementations of an interface or subclasses of a class";
     }

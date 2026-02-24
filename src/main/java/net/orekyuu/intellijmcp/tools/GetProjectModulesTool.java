@@ -31,11 +31,6 @@ public class GetProjectModulesTool extends AbstractProjectMcpTool<GetProjectModu
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "get_project_modules";
-    }
-
-    @Override
     public String getDescription() {
         return "List modules in a project along with their directories and source/resource roots";
     }

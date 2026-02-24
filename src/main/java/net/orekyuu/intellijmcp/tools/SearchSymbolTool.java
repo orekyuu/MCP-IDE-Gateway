@@ -31,11 +31,6 @@ public class SearchSymbolTool extends AbstractProjectMcpTool<SearchSymbolTool.Se
             Arg.enumArg("symbolType", "Type of symbol to search for", SymbolType.class).optional(SymbolType.ALL);
 
     @Override
-    public String getName() {
-        return "search_symbol";
-    }
-
-    @Override
     public String getDescription() {
         return "Search for symbols (methods, fields, classes) by name in the project";
     }

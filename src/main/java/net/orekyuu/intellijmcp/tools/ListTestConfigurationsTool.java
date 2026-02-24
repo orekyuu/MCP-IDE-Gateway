@@ -24,11 +24,6 @@ public class ListTestConfigurationsTool extends AbstractProjectMcpTool<Object> {
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "list_test_configurations";
-    }
-
-    @Override
     public String getDescription() {
         return "List available test configurations for a file. Returns configurations for the whole file and for each individual test name found in the file.";
     }

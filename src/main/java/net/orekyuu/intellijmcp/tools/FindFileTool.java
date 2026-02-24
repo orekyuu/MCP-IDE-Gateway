@@ -33,11 +33,6 @@ public class FindFileTool extends AbstractProjectMcpTool<FindFileTool.FindFileRe
             Arg.integer("maxResults", "Maximum number of results to return").optional(100);
 
     @Override
-    public String getName() {
-        return "find_file";
-    }
-
-    @Override
     public String getDescription() {
         return "Search for files by name in a project. Supports glob patterns (* and ?) for flexible matching.";
     }

@@ -23,6 +23,11 @@
         <extensionPoint name="testConfigurationExpander"
                         interface="net.orekyuu.intellijmcp.tools.TestConfigurationExpander"
                         dynamic="true"/>
+        <extensionPoint name="mcpTool"
+                        beanClass="net.orekyuu.intellijmcp.tools.McpToolBean"
+                        dynamic="true">
+            <with attribute="implementation" implements="net.orekyuu.intellijmcp.tools.McpTool"/>
+        </extensionPoint>
     </extensionPoints>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -39,6 +44,37 @@
                     icon="AllIcons.Actions.Execute"/>
         <backgroundPostStartupActivity
             implementation="net.orekyuu.intellijmcp.comment.InlineCommentStartupActivity"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="net.orekyuu.mcp-ide-gateway">
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListProjectsTool"           name="list_projects"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.OpenFileTool"               name="open_file"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.CallHierarchyTool"          name="get_call_hierarchy"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.FindClassTool"              name="find_class"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetClassStructureTool"      name="get_class_structure"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetDefinitionTool"          name="get_definition"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.FindUsagesTool"             name="find_usages"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetImplementationsTool"     name="get_implementations"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetDiagnosticsTool"         name="get_diagnostics"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.SearchSymbolTool"           name="search_symbol"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetTypeHierarchyTool"       name="get_type_hierarchy"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetDocumentationTool"       name="get_documentation"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.OptimizeImportsTool"        name="optimize_imports"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RenameSymbolTool"           name="rename_symbol"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ExtractMethodTool"          name="extract_method"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RunInspectionTool"          name="run_inspection"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.SearchTextTool"             name="search_text"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.FindFileTool"               name="find_file"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetSourceCodeTool"          name="get_source_code"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ReadFileTool"               name="read_file"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.AddInlineCommentTool"       name="add_inline_comment"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetProjectModulesTool"      name="get_project_modules"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.GetProjectDependenciesTool" name="get_project_dependencies"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.CreateFileOrDirectoryTool"  name="create_file_or_directory"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.DeleteFileOrDirectoryTool"  name="delete_file_or_directory"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RunTestTool"                name="run_test"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListTestConfigurationsTool" name="list_test_configurations"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.FileStructureTool"          name="get_file_structure"/>
     </extensions>
 
     <applicationListeners>

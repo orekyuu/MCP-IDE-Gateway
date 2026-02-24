@@ -23,11 +23,6 @@ public class GetSourceCodeTool extends AbstractProjectMcpTool<GetSourceCodeTool.
     private static final Arg<Optional<String>> MEMBER_NAME = Arg.string("memberName", "Method or field name. If not specified, returns the entire class source code").optional();
 
     @Override
-    public String getName() {
-        return "get_source_code";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the source code of a class or a specific member (method/field) by class name";
     }

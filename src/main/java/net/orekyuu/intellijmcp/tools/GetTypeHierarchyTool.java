@@ -28,11 +28,6 @@ public class GetTypeHierarchyTool extends AbstractProjectMcpTool<GetTypeHierarch
             Arg.bool("includeSubclasses", "Whether to include subclasses/implementors").optional(true);
 
     @Override
-    public String getName() {
-        return "get_type_hierarchy";
-    }
-
-    @Override
     public String getDescription() {
         return "Get the type hierarchy of a class including superclasses, interfaces, and subclasses/implementors";
     }

@@ -34,11 +34,6 @@ public class CreateFileOrDirectoryTool extends AbstractProjectMcpTool<CreateFile
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "create_file_or_directory";
-    }
-
-    @Override
     public String getDescription() {
         return "Create a file or directory in the project";
     }

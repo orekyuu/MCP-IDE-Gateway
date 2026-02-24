@@ -63,11 +63,6 @@ public class RunInspectionTool extends AbstractProjectMcpTool<RunInspectionTool.
             Arg.integer("timeout", "Timeout in seconds. Returns partial results if timeout is reached.").min(0).optional(60);
 
     @Override
-    public String getName() {
-        return "run_inspection";
-    }
-
-    @Override
     public String getDescription() {
         return "Run IntelliJ code inspections on a file or the entire project to find potential issues, code smells, and improvements";
     }

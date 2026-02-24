@@ -31,11 +31,6 @@ public class OptimizeImportsTool extends AbstractProjectMcpTool<OptimizeImportsT
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "optimize_imports";
-    }
-
-    @Override
     public String getDescription() {
         return "Optimize imports in a file (remove unused imports and organize)";
     }

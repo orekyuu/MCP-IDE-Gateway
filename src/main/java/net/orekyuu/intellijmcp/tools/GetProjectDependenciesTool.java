@@ -28,11 +28,6 @@ public class GetProjectDependenciesTool extends AbstractProjectMcpTool<GetProjec
     private static final Arg<Optional<String>> MODULE_NAME = Arg.string("moduleName", "Module name to filter dependencies").optional();
 
     @Override
-    public String getName() {
-        return "get_project_dependencies";
-    }
-
-    @Override
     public String getDescription() {
         return "List module and library dependencies for the entire project or a single module";
     }

@@ -45,11 +45,6 @@ public class RunTestTool extends AbstractProjectMcpTool<Object> {
     private static final Arg<Project> PROJECT = Arg.project();
 
     @Override
-    public String getName() {
-        return "run_test";
-    }
-
-    @Override
     public String getDescription() {
         return "Run tests in a file or a specific test method using IntelliJ's test runner. Supports any language with a run configuration provider (Java, Kotlin, Python, JavaScript, etc.)";
     }
