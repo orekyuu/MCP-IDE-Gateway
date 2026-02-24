@@ -1,7 +1,9 @@
 package net.orekyuu.intellijmcp.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.extensions.PluginId;
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.json.schema.jackson.DefaultJsonSchemaValidator;
 import io.modelcontextprotocol.server.McpServer;
@@ -48,12 +50,14 @@ public class McpServerImpl {
                         .build();
 
             // Build MCP server
+            var pluginDescriptor = PluginManagerCore.getPlugin(PluginId.getId("net.orekyuu.mcp-ide-gateway"));
+            var pluginVersion = pluginDescriptor != null ? pluginDescriptor.getVersion() : "unknown";
             var jsonMapper = new JacksonMcpJsonMapper(objectMapper);
             var jsonSchemaValidator = new DefaultJsonSchemaValidator(objectMapper);
             mcpServer = McpServer.sync(transportProvider)
                 .jsonMapper(jsonMapper)
                 .jsonSchemaValidator(jsonSchemaValidator)
-                .serverInfo("mcp-ide-gateway", "1.0.0")
+                .serverInfo("mcp-ide-gateway", pluginVersion)
                 .capabilities(McpSchema.ServerCapabilities.builder()
                         .logging()
                         .prompts(false)

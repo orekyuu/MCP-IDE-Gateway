@@ -4,7 +4,15 @@ plugins {
 }
 
 group = "net.orekyuu"
-version = "1.0-SNAPSHOT"
+version = run {
+    val tag = try {
+        val process = Runtime.getRuntime().exec(arrayOf("git", "tag", "--points-at", "HEAD", "--sort=-version:refname"))
+        process.inputStream.bufferedReader().readLine()?.trim()?.removePrefix("v")?.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null
+    }
+    tag ?: "1.0-SNAPSHOT"
+}
 
 repositories {
     mavenCentral()
@@ -66,7 +74,7 @@ intellijPlatform {
     projectName = "mcp-ide-gateway"
 
     pluginConfiguration {
-        version = "1.0-SNAPSHOT"
+        version = project.version.toString()
 
         ideaVersion {
             sinceBuild = "243"
