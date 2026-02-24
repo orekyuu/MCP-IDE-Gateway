@@ -7,7 +7,7 @@ group = "net.orekyuu"
 version = run {
     val tag = try {
         val process = Runtime.getRuntime().exec(arrayOf("git", "tag", "--points-at", "HEAD", "--sort=-version:refname"))
-        process.inputStream.bufferedReader().readLine()?.trim()?.removePrefix("v")?.takeIf { it.isNotEmpty() }
+        process.inputStream.bufferedReader().readLine()?.trim()?.removePrefix("v-")?.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
         null
     }
