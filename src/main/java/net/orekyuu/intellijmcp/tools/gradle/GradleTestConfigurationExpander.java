@@ -33,9 +33,25 @@ public class GradleTestConfigurationExpander implements TestConfigurationExpande
                 continue;
             }
 
+            // Extract the test filter arguments (e.g. "--tests com.example.MyTest") from the
+            // original taskNames. IntelliJ stores the filter inline with the task names, so
+            // a plain setTaskNames() would strip it. We preserve arguments (tokens starting
+            // with "--") and append them to the new task names.
+            List<String> originalTaskNames = gradleConfig.getSettings().getTaskNames();
+            int filterArgStart = originalTaskNames.size();
+            for (int i = 0; i < originalTaskNames.size(); i++) {
+                if (originalTaskNames.get(i).startsWith("--")) {
+                    filterArgStart = i;
+                    break;
+                }
+            }
+            List<String> testFilterArgs = new ArrayList<>(originalTaskNames.subList(filterArgStart, originalTaskNames.size()));
+
             for (TasksToRun tasksToRun : allTasks) {
                 ExternalSystemRunConfiguration cloned = gradleConfig.clone();
-                cloned.getSettings().setTaskNames(tasksToRun.getTasks());
+                List<String> newTaskNames = new ArrayList<>(tasksToRun.getTasks());
+                newTaskNames.addAll(testFilterArgs);
+                cloned.getSettings().setTaskNames(newTaskNames);
                 String taskName = tasksToRun.getTestName();
                 cloned.setName(config.getName() + " (" + taskName + ")");
 

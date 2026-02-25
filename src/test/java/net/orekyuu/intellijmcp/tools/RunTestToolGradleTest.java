@@ -5,6 +5,7 @@ import com.intellij.execution.actions.ConfigurationContext;
 import com.intellij.execution.actions.ConfigurationFromContext;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.externalSystem.model.ProjectSystemId;
+import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration;
 import com.intellij.openapi.externalSystem.settings.ExternalProjectSettings;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -104,6 +105,41 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
                 @Test
                 public void testHello() {
                     System.out.println("hello");
+                }
+            }
+            """;
+
+    private static final String JUNIT5_BUILD_GRADLE = """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+                testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+            }
+            test {
+                useJUnitPlatform()
+            }
+            """;
+
+    private static final String NESTED_TEST_CONTENT = """
+            package com.example;
+            import org.junit.jupiter.api.Nested;
+            import org.junit.jupiter.api.Test;
+            public class OuterTest {
+                @Test
+                void testOuter() {
+                    System.out.println("outer");
+                }
+                @Nested
+                class InnerTest {
+                    @Test
+                    void testInner() {
+                        System.out.println("inner");
+                    }
                 }
             }
             """;
@@ -245,6 +281,130 @@ public class RunTestToolGradleTest extends ExternalSystemImportingTestCase {
             ));
             McpToolResultAssert.assertThat(result).isSuccess();
             UIUtil.dispatchAllInvocationEvents();
+        });
+    }
+
+    /**
+     * Verifies that specifying a test class file generates a Gradle configuration scoped
+     * to that specific class only (via --tests in taskNames).
+     * Without the filter, Gradle runs ALL tests in the module instead of just the class.
+     */
+    public void testGetConfigurationsForFileScopedToSpecificTestClass() throws Exception {
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
+
+        PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(myProject).findFile(vf));
+        assertThat(psiFile).isNotNull();
+
+        RunTestTool tool = new RunTestTool();
+        var configs = tool.getConfigurationsForFile(psiFile);
+        assertThat(configs).isNotEmpty();
+
+        // IntelliJ stores the --tests filter in taskNames, not scriptParameters.
+        // e.g. taskNames = [":test", "--tests", "com.example.MyTest"]
+        List<RunnerAndConfigurationSettings> gradleConfigs = configs.stream()
+                .filter(c -> c.getType().getDisplayName().equals("Gradle"))
+                .toList();
+        assertThat(gradleConfigs).isNotEmpty();
+
+        gradleConfigs.forEach(c -> {
+            if (c.getConfiguration() instanceof ExternalSystemRunConfiguration esrc) {
+                String allTaskNames = String.join(" ", esrc.getSettings().getTaskNames());
+                System.out.println("Config: " + c.getName() + ", taskNames: " + allTaskNames);
+                assertThat(allTaskNames)
+                        .as("Gradle config '%s' must contain --tests filter to run only MyTest, not all tests", c.getName())
+                        .contains("com.example.MyTest");
+            }
+        });
+    }
+
+    /**
+     * Verifies that a file with a @Nested inner test class generates a Gradle configuration
+     * scoped to the outer class. Gradle also matches OuterTest$InnerTest from that filter.
+     */
+    public void testGetConfigurationsForFileWithNestedClassScopedToOuterClass() throws Exception {
+        createProjectConfig(JUNIT5_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/OuterTest.java", NESTED_TEST_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/OuterTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
+
+        PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(myProject).findFile(vf));
+        assertThat(psiFile).isNotNull();
+
+        RunTestTool tool = new RunTestTool();
+        var configs = tool.getConfigurationsForFile(psiFile);
+        assertThat(configs).isNotEmpty();
+
+        List<RunnerAndConfigurationSettings> gradleConfigs = configs.stream()
+                .filter(c -> c.getType().getDisplayName().equals("Gradle"))
+                .toList();
+        assertThat(gradleConfigs).isNotEmpty();
+
+        // The config must scope to OuterTest; Gradle also matches OuterTest$InnerTest.
+        gradleConfigs.forEach(c -> {
+            if (c.getConfiguration() instanceof ExternalSystemRunConfiguration esrc) {
+                String allTaskNames = String.join(" ", esrc.getSettings().getTaskNames());
+                System.out.println("Config: " + c.getName() + ", taskNames: " + allTaskNames);
+                assertThat(allTaskNames)
+                        .as("Gradle config '%s' must contain --tests filter scoped to OuterTest", c.getName())
+                        .contains("com.example.OuterTest");
+            }
+        });
+    }
+
+    /**
+     * Bug regression test: GradleTestConfigurationExpander must preserve the --tests filter
+     * in taskNames when expanding a class-scoped configuration for multiple Gradle test tasks.
+     * Before the fix, setTaskNames(tasksToRun.getTasks()) stripped the filter, causing all
+     * tests in the module to run instead of just the specified class.
+     */
+    public void testExpanderPreservesTestFilterForMultipleTasks() throws Exception {
+        createProjectConfig(MULTI_TASK_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/MyTest.java", TEST_CLASS_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+        Path resolved = Path.of(projectPath).resolve("project/src/test/java/com/example/MyTest.java");
+        VirtualFile vf = VirtualFileManager.getInstance().findFileByNioPath(resolved);
+        assertThat(vf).isNotNull();
+
+        PsiFile psiFile = ReadAction.compute(() -> PsiManager.getInstance(myProject).findFile(vf));
+        assertThat(psiFile).isNotNull();
+
+        RunTestTool tool = new RunTestTool();
+        var configs = tool.getConfigurationsForFile(psiFile);
+        assertThat(configs).isNotEmpty();
+
+        List<RunnerAndConfigurationSettings> gradleConfigs = configs.stream()
+                .filter(c -> c.getType().getDisplayName().equals("Gradle"))
+                .toList();
+        assertThat(gradleConfigs)
+                .as("Should have multiple Gradle configs after expansion (one per task)")
+                .hasSizeGreaterThanOrEqualTo(2);
+
+        // Every expanded config must preserve the --tests filter.
+        // If the filter is stripped, Gradle runs all tests in the module.
+        gradleConfigs.forEach(c -> {
+            if (c.getConfiguration() instanceof ExternalSystemRunConfiguration esrc) {
+                String allTaskNames = String.join(" ", esrc.getSettings().getTaskNames());
+                System.out.println("Config: " + c.getName() + ", taskNames: " + allTaskNames);
+                assertThat(allTaskNames)
+                        .as("Expanded config '%s' must still contain --tests filter after task expansion", c.getName())
+                        .contains("com.example.MyTest");
+            }
         });
     }
 
