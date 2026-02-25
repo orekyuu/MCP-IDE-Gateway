@@ -99,6 +99,23 @@ public final class InlineCommentEditorListener implements Disposable {
                     }
 
                     @Override
+                    public void onCommentEdited(InlineComment comment) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            Inlay<?> oldInlay = commentInlays.remove(comment.getId());
+                            if (oldInlay != null && oldInlay.isValid()) {
+                                Disposer.dispose(oldInlay);
+                            }
+                            for (Editor editor : EditorFactory.getInstance().getAllEditors()) {
+                                if (isIrrelevantEditor(editor)) continue;
+                                String filePath = getFilePath(editor);
+                                if (comment.getFilePath().equals(filePath)) {
+                                    addInlayForComment(editor, comment);
+                                }
+                            }
+                        });
+                    }
+
+                    @Override
                     public void onAllCommentsCleared() {
                         ApplicationManager.getApplication().invokeLater(() -> {
                             for (Inlay<?> inlay : commentInlays.values()) {

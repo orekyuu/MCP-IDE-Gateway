@@ -45,6 +45,19 @@ public final class InlineCommentService {
                 });
     }
 
+    public InlineComment updateComment(String id, String newComment) {
+        for (int i = 0; i < comments.size(); i++) {
+            InlineComment old = comments.get(i);
+            if (old.getId().equals(id)) {
+                InlineComment updated = new InlineComment(id, old.getFilePath(), old.getLine(), newComment);
+                comments.set(i, updated);
+                project.getMessageBus().syncPublisher(TOPIC).onCommentEdited(updated);
+                return updated;
+            }
+        }
+        return null;
+    }
+
     public List<InlineComment> getCommentsForFile(String filePath) {
         return comments.stream()
                 .filter(c -> c.getFilePath().equals(filePath))
@@ -63,6 +76,7 @@ public final class InlineCommentService {
     public interface InlineCommentListener {
         default void onCommentAdded(InlineComment comment) {}
         default void onCommentRemoved(InlineComment comment) {}
+        default void onCommentEdited(InlineComment comment) {}
         default void onAllCommentsCleared() {}
     }
 }

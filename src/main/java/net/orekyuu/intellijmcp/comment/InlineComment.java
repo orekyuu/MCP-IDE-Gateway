@@ -19,6 +19,13 @@ public final class InlineComment {
         this.comment = comment;
     }
 
+    InlineComment(String id, String filePath, int line, String comment) {
+        this.id = id;
+        this.filePath = filePath;
+        this.line = line;
+        this.comment = comment;
+    }
+
     public String getId() {
         return id;
     }
