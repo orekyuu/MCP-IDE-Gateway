@@ -75,6 +75,8 @@
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.RunTestTool"                name="run_test"/>
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListTestConfigurationsTool" name="list_test_configurations"/>
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.FileStructureTool"          name="get_file_structure"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListRunConfigurationsTool"  name="list_run_configurations"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RunConfigurationTool"       name="run_configuration"/>
     </extensions>
 
     <applicationListeners>
