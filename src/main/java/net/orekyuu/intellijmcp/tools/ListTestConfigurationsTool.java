@@ -1,13 +1,15 @@
 package net.orekyuu.intellijmcp.tools;
 
+import com.intellij.codeInsight.TestFrameworks;
 import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiNamedElement;
+import com.intellij.psi.PsiMethod;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.modelcontextprotocol.spec.McpSchema;
 import net.orekyuu.intellijmcp.tools.validator.Arg;
@@ -15,7 +17,9 @@ import net.orekyuu.intellijmcp.tools.validator.Args;
 import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class ListTestConfigurationsTool extends AbstractProjectMcpTool<Object> {
 
@@ -57,14 +61,22 @@ public class ListTestConfigurationsTool extends AbstractProjectMcpTool<Object> {
                                 .map(c -> new ConfigurationInfo(c.getName(), c.getType().getDisplayName()))
                                 .toList();
 
-                        // Per-test configurations
+                        // Per-test configurations: only test classes and test methods,
+                        // mirroring how TestRunLineMarkerProvider attaches gutter icons.
                         List<String> testNames = ReadAction.compute(() -> {
-                            Collection<PsiNamedElement> namedElements = PsiTreeUtil.findChildrenOfType(psiFile, PsiNamedElement.class);
-                            return namedElements.stream()
-                                    .map(PsiNamedElement::getName)
-                                    .filter(Objects::nonNull)
-                                    .distinct()
-                                    .toList();
+                            TestFrameworks testFrameworks = TestFrameworks.getInstance();
+                            List<String> names = new ArrayList<>();
+                            for (PsiClass psiClass : PsiTreeUtil.findChildrenOfType(psiFile, PsiClass.class)) {
+                                if (testFrameworks.isTestClass(psiClass) && psiClass.getName() != null) {
+                                    names.add(psiClass.getName());
+                                }
+                            }
+                            for (PsiMethod psiMethod : PsiTreeUtil.findChildrenOfType(psiFile, PsiMethod.class)) {
+                                if (testFrameworks.isTestMethod(psiMethod, false) && psiMethod.getName() != null) {
+                                    names.add(psiMethod.getName());
+                                }
+                            }
+                            return names.stream().distinct().toList();
                         });
 
                         List<TestConfigurationEntry> testEntries = new ArrayList<>();

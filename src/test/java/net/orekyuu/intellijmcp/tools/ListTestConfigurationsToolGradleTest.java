@@ -9,6 +9,7 @@ import org.jetbrains.plugins.gradle.util.GradleConstants;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +81,22 @@ public class ListTestConfigurationsToolGradleTest extends ExternalSystemImportin
             }
             """;
 
+    private static final String JUNIT5_BUILD_GRADLE = """
+            plugins {
+                id 'java'
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+                testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+            }
+            test {
+                useJUnitPlatform()
+            }
+            """;
+
     private static final String TEST_CLASS_CONTENT = """
             package com.example;
             import org.junit.Test;
@@ -90,6 +107,99 @@ public class ListTestConfigurationsToolGradleTest extends ExternalSystemImportin
                 }
             }
             """;
+
+    private static final String TEST_CLASS_WITH_EXTRA_MEMBERS = """
+            package com.example;
+            import org.junit.Test;
+            public class RichTest {
+                private String myField = "hello";
+
+                @Test
+                public void testHello() {
+                    String localVar = "world";
+                    System.out.println(localVar);
+                }
+
+                public void helperMethod() {}
+            }
+            """;
+
+    private static final String NESTED_TEST_CONTENT = """
+            package com.example;
+            import org.junit.jupiter.api.Nested;
+            import org.junit.jupiter.api.Test;
+            public class OuterTest {
+                @Test
+                void testOuter() {}
+                @Nested
+                class InnerTest {
+                    @Test
+                    void testInner() {}
+                }
+            }
+            """;
+
+    /**
+     * Verifies that testConfigurations only lists test classes and test methods.
+     * Fields, local variables, and non-test methods must not appear as candidates.
+     */
+    public void testTestConfigurationsOnlyContainTestSymbols() throws Exception {
+        createProjectConfig(SIMPLE_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/RichTest.java", TEST_CLASS_WITH_EXTRA_MEMBERS);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+
+        ListTestConfigurationsTool tool = new ListTestConfigurationsTool();
+        var result = tool.execute(Map.of(
+                "projectPath", projectPath,
+                "filePath", "project/src/test/java/com/example/RichTest.java"
+        ));
+
+        McpToolResultAssert.assertThat(result).isSuccess();
+        var response = (ListTestConfigurationsTool.ListTestConfigurationsResponse)
+                McpToolResultAssert.assertThat(result).getSuccessResponse();
+
+        List<String> testNames = response.testConfigurations().stream()
+                .map(ListTestConfigurationsTool.TestConfigurationEntry::testName)
+                .toList();
+        System.out.println("Test configuration names: " + testNames);
+
+        assertThat(testNames).contains("testHello");
+        // Non-test symbols must not appear
+        assertThat(testNames).doesNotContain("myField", "localVar", "helperMethod");
+    }
+
+    /**
+     * Verifies that @Nested JUnit 5 test methods appear in testConfigurations.
+     */
+    public void testTestConfigurationsIncludeNestedTestMethods() throws Exception {
+        createProjectConfig(JUNIT5_BUILD_GRADLE);
+        createProjectSubFile("src/test/java/com/example/OuterTest.java", NESTED_TEST_CONTENT);
+        importProject();
+
+        String projectPath = myProject.getBasePath();
+        assertThat(projectPath).isNotNull();
+
+        ListTestConfigurationsTool tool = new ListTestConfigurationsTool();
+        var result = tool.execute(Map.of(
+                "projectPath", projectPath,
+                "filePath", "project/src/test/java/com/example/OuterTest.java"
+        ));
+
+        McpToolResultAssert.assertThat(result).isSuccess();
+        var response = (ListTestConfigurationsTool.ListTestConfigurationsResponse)
+                McpToolResultAssert.assertThat(result).getSuccessResponse();
+
+        List<String> testNames = response.testConfigurations().stream()
+                .map(ListTestConfigurationsTool.TestConfigurationEntry::testName)
+                .toList();
+        System.out.println("Test configuration names: " + testNames);
+
+        // Both outer and @Nested inner test methods must appear
+        assertThat(testNames).contains("testOuter", "testInner");
+    }
 
     public void testExecuteListsFileConfigurations() throws Exception {
         createProjectConfig(SIMPLE_BUILD_GRADLE);
