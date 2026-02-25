@@ -147,18 +147,7 @@ public class RunTestTool extends AbstractProjectMcpTool<Object> {
 
     List<RunnerAndConfigurationSettings> getConfigurationsForFile(PsiFile psiFile) {
         List<RunnerAndConfigurationSettings> configs = ReadAction.compute(() -> {
-            // Use the top-level PsiClass (not PsiFile) as the context element so that
-            // the Gradle configuration producer generates a class-scoped --tests filter.
-            // ConfigurationContext(psiFile) produces empty script parameters, causing
-            // Gradle to run all tests in the module instead of just the specified class.
-            Collection<PsiClass> classes = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass.class);
-            PsiClass topLevelClass = classes.stream()
-                    .filter(c -> c.getParent() instanceof PsiFile)
-                    .findFirst()
-                    .orElse(null);
-            PsiElement contextElement = topLevelClass != null ? topLevelClass : psiFile;
-
-            ConfigurationContext context = new ConfigurationContext(contextElement);
+            ConfigurationContext context = new ConfigurationContext(psiFile);
             List<ConfigurationFromContext> fromContext = context.getConfigurationsFromContext();
             if (fromContext != null && !fromContext.isEmpty()) {
                 return fromContext.stream()
