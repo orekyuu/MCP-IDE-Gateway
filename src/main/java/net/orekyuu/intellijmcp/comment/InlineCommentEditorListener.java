@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.ComponentInlayKt;
 import com.intellij.openapi.editor.ComponentInlayRenderer;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.Inlay;
 import com.intellij.openapi.editor.InlayProperties;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
@@ -63,6 +64,8 @@ public final class InlineCommentEditorListener implements Disposable {
             public void editorReleased(@NotNull EditorFactoryEvent event) {
                 Editor editor = event.getEditor();
                 if (isIrrelevantEditor(editor)) return;
+                // Viewer inlays are automatically disposed with the editor
+                if (editor instanceof EditorEx ex && ex.isViewer()) return;
 
                 // Dispose gutter manager
                 CommentGutterManager gm = gutterManagers.remove(editor);
@@ -171,7 +174,9 @@ public final class InlineCommentEditorListener implements Disposable {
 
     @SuppressWarnings("UnstableApiUsage")
     private void addInlayForComment(Editor editor, InlineComment comment) {
-        if (commentInlays.containsKey(comment.getId())) return;
+        boolean isViewer = editor instanceof EditorEx ex && ex.isViewer();
+        // For normal editors, skip if inlay already exists
+        if (!isViewer && commentInlays.containsKey(comment.getId())) return;
 
         int lineNumber = comment.getLine() - 1; // Convert to 0-based
         if (lineNumber < 0 || lineNumber >= editor.getDocument().getLineCount()) return;
@@ -197,7 +202,10 @@ public final class InlineCommentEditorListener implements Disposable {
         );
 
         if (inlay != null) {
-            commentInlays.put(comment.getId(), inlay);
+            // Only track inlays for normal editors; viewer inlays are auto-disposed
+            if (!isViewer) {
+                commentInlays.put(comment.getId(), inlay);
+            }
             editor.getContentComponent().revalidate();
             editor.getContentComponent().repaint();
         }

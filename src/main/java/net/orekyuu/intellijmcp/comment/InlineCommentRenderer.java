@@ -3,7 +3,6 @@ package net.orekyuu.intellijmcp.comment;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.lang.Language;
-import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonShortcuts;
@@ -18,7 +17,6 @@ import com.intellij.openapi.fileTypes.SyntaxHighlighter;
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.ui.ColorUtil;
@@ -43,7 +41,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.StyleSheet;
 import java.awt.*;
-import java.awt.event.HierarchyEvent;
 import java.util.*;
 import java.util.List;
 
@@ -77,6 +74,21 @@ public final class InlineCommentRenderer {
      */
     public static JComponent createCommentComponent(
             Editor editor,
+            InlineComment comment,
+            Runnable onDismiss,
+            Runnable onFoldToggle
+    ) {
+        return createCommentComponent(editor.getProject(), comment, onDismiss, onFoldToggle);
+    }
+
+    /**
+     * Creates a thread comment panel styled like a GitHub PR review comment.
+     * This overload accepts a Project directly (useful for ToolWindow panels).
+     *
+     * @param onFoldToggle called when the user clicks fold/unfold to trigger inlay refresh
+     */
+    public static JComponent createCommentComponent(
+            Project project,
             InlineComment comment,
             Runnable onDismiss,
             Runnable onFoldToggle
@@ -119,7 +131,6 @@ public final class InlineCommentRenderer {
         card.add(header, BorderLayout.NORTH);
 
         // Messages panel
-        Project project = editor.getProject();
         JPanel messagesPanel = new JPanel();
         messagesPanel.setLayout(new BoxLayout(messagesPanel, BoxLayout.Y_AXIS));
         messagesPanel.setBackground(COMMENT_BG);
@@ -205,7 +216,6 @@ public final class InlineCommentRenderer {
             replyBtn.addActionListener(e -> sendReply.run());
 
             // Register Ctrl+Enter shortcut via addSettingsProvider
-            Disposable keyDisposable = Disposer.newDisposable("reply-shortcut-handler");
             replyField.addSettingsProvider(innerEditor -> {
                 DumbAwareAction submitAction = new DumbAwareAction() {
                     @Override
@@ -220,18 +230,9 @@ public final class InlineCommentRenderer {
                 };
                 submitAction.registerCustomShortcutSet(
                         CommonShortcuts.getCtrlEnter(),
-                        innerEditor.getContentComponent(),
-                        keyDisposable
+                        innerEditor.getContentComponent()
                 );
                 innerEditor.getSettings().setUseSoftWraps(true);
-            });
-
-            replyField.addHierarchyListener(e -> {
-                if ((e.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0
-                        && !replyField.isDisplayable()
-                        && !Disposer.isDisposed(keyDisposable)) {
-                    Disposer.dispose(keyDisposable);
-                }
             });
 
             // Fold button (visible when thread has > 3 messages and is currently unfolded)
@@ -368,7 +369,12 @@ public final class InlineCommentRenderer {
     }
 
     private static JEditorPane createBodyPane(String commentText, Project project) {
-        JEditorPane pane = new JEditorPane();
+        JEditorPane pane = new JEditorPane() {
+            @Override
+            public boolean getScrollableTracksViewportWidth() {
+                return true;
+            }
+        };
         pane.setEditable(false);
         pane.setOpaque(false);
 

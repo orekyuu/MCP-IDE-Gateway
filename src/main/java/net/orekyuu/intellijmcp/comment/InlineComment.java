@@ -1,5 +1,7 @@
 package net.orekyuu.intellijmcp.comment;
 
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,6 +52,14 @@ public final class InlineComment {
 
     public List<CommentMessage> getMessages() {
         return List.copyOf(messages);
+    }
+
+    /** Returns the timestamp of the most recently added or edited message. */
+    public Instant getUpdatedAt() {
+        return messages.stream()
+                .map(CommentMessage::getCreatedAt)
+                .max(Comparator.naturalOrder())
+                .orElse(Instant.EPOCH);
     }
 
     /** Returns the text of the first message (for backward compatibility). */
