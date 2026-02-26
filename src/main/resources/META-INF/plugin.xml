@@ -78,8 +78,9 @@
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListRunConfigurationsTool"  name="list_run_configurations"/>
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.RunConfigurationTool"       name="run_configuration"/>
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.ListInlineCommentsTool"     name="list_inline_comments"/>
-        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RemoveInlineCommentTool"   name="remove_inline_comment"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.RemoveInlineCommentTool"    name="remove_inline_comment"/>
         <mcpTool implementation="net.orekyuu.intellijmcp.tools.EditInlineCommentTool"     name="edit_inline_comment"/>
+        <mcpTool implementation="net.orekyuu.intellijmcp.tools.ReplyToInlineCommentTool"  name="reply_to_inline_comment"/>
     </extensions>
 
     <applicationListeners>

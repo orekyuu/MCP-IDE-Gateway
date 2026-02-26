@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import io.modelcontextprotocol.spec.McpSchema;
+import net.orekyuu.intellijmcp.comment.CommentMessage;
 import net.orekyuu.intellijmcp.comment.InlineComment;
 import net.orekyuu.intellijmcp.comment.InlineCommentService;
 import net.orekyuu.intellijmcp.tools.validator.Arg;
@@ -11,6 +12,7 @@ import net.orekyuu.intellijmcp.tools.validator.Args;
 import net.orekyuu.intellijmcp.tools.validator.ProjectRelativePath;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -57,11 +59,15 @@ public class AddInlineCommentTool extends AbstractProjectMcpTool<AddInlineCommen
                         InlineComment inlineComment = InlineCommentService.getInstance(project)
                                 .addComment(absolutePath, line, comment);
 
+                        List<MessageInfo> messages = inlineComment.getMessages().stream()
+                                .map(m -> new MessageInfo(m.getMessageId(), m.getAuthor().name(), m.getText()))
+                                .toList();
+
                         return successResult(new AddInlineCommentResponse(
                                 inlineComment.getId(),
                                 absolutePath,
                                 line,
-                                comment,
+                                messages,
                                 "Inline comment added successfully"
                         ));
                     } catch (Exception e) {
@@ -71,11 +77,13 @@ public class AddInlineCommentTool extends AbstractProjectMcpTool<AddInlineCommen
                 .orElseErrors(errors -> errorResult("Error: " + Args.formatErrors(errors)));
     }
 
+    public record MessageInfo(String messageId, String author, String text) {}
+
     public record AddInlineCommentResponse(
             String commentId,
             String filePath,
             int line,
-            String comment,
+            List<MessageInfo> messages,
             String message
     ) {}
 }

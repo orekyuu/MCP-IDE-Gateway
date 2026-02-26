@@ -71,7 +71,7 @@ class EditInlineCommentToolTest extends BaseMcpToolTest<EditInlineCommentTool> {
 
         InlineComment updated = service.getAllComments().getFirst();
         assertThat(updated.getId()).isEqualTo(added.getId());
-        assertThat(updated.getComment()).isEqualTo("updated text");
+        assertThat(updated.getFirstMessageText()).isEqualTo("updated text");
         assertThat(updated.getFilePath()).isEqualTo("/some/file.java");
         assertThat(updated.getLine()).isEqualTo(10);
     }

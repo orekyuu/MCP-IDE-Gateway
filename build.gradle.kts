@@ -55,6 +55,7 @@ dependencies {
     // Markdown rendering
     implementation("org.commonmark:commonmark:0.24.0")
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0")
     implementation("org.commonmark:commonmark-ext-autolink:0.24.0")
 
     // テスト

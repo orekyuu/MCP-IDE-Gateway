@@ -20,7 +20,7 @@ public class ListInlineCommentsTool extends AbstractProjectMcpTool<Object> {
 
     @Override
     public String getDescription() {
-        return "List all inline comments displayed in the IDE editor. Optionally filter by file path. Returns comment id, file path, line number, and comment text.";
+        return "List all inline comments displayed in the IDE editor. Optionally filter by file path. Returns comment id, file path, line number, and full message thread.";
     }
 
     @Override
@@ -43,7 +43,17 @@ public class ListInlineCommentsTool extends AbstractProjectMcpTool<Object> {
                         }
 
                         List<InlineCommentInfo> infos = comments.stream()
-                                .map(c -> new InlineCommentInfo(c.getId(), c.getFilePath(), c.getLine(), c.getComment()))
+                                .map(c -> new InlineCommentInfo(
+                                        c.getId(),
+                                        c.getFilePath(),
+                                        c.getLine(),
+                                        c.getMessages().stream()
+                                                .map(m -> new MessageInfo(
+                                                        m.getMessageId(),
+                                                        m.getAuthor().name(),
+                                                        m.getText(),
+                                                        m.getCreatedAt().toString()))
+                                                .toList()))
                                 .toList();
 
                         return successResult(new ListInlineCommentsResponse(infos));
@@ -64,6 +74,13 @@ public class ListInlineCommentsTool extends AbstractProjectMcpTool<Object> {
             String id,
             String filePath,
             int line,
-            String comment
+            List<MessageInfo> messages
+    ) {}
+
+    public record MessageInfo(
+            String messageId,
+            String author,
+            String text,
+            String createdAt
     ) {}
 }

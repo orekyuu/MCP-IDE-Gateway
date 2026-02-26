@@ -84,6 +84,16 @@ public class InlineCommentsPanel implements Disposable {
                     }
 
                     @Override
+                    public void onCommentEdited(InlineComment comment) {
+                        refreshTable();
+                    }
+
+                    @Override
+                    public void onReplyAdded(InlineComment comment) {
+                        refreshTable();
+                    }
+
+                    @Override
                     public void onAllCommentsCleared() {
                         refreshTable();
                     }
@@ -147,7 +157,7 @@ public class InlineCommentsPanel implements Disposable {
                 }
                 case 1 -> comment.getLine();
                 case 2 -> {
-                    String text = comment.getComment();
+                    String text = comment.getFirstMessageText();
                     yield text.length() > 100 ? text.substring(0, 100) + "..." : text;
                 }
                 default -> "";

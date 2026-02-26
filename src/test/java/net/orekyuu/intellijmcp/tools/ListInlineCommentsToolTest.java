@@ -69,7 +69,7 @@ class ListInlineCommentsToolTest extends BaseMcpToolTest<ListInlineCommentsTool>
         var response = (ListInlineCommentsTool.ListInlineCommentsResponse)
                 McpToolResultAssert.assertThat(result).getSuccessResponse();
         assertThat(response.comments()).hasSize(1);
-        assertThat(response.comments().getFirst().comment()).isEqualTo("comment for A");
+        assertThat(response.comments().getFirst().messages().getFirst().text()).isEqualTo("comment for A");
     }
 
     @Test

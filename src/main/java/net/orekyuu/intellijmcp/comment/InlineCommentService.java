@@ -29,7 +29,11 @@ public final class InlineCommentService {
     }
 
     public InlineComment addComment(String filePath, int line, String comment) {
-        InlineComment inlineComment = new InlineComment(filePath, line, comment);
+        return addComment(filePath, line, comment, CommentMessage.Author.AI);
+    }
+
+    public InlineComment addComment(String filePath, int line, String comment, CommentMessage.Author author) {
+        InlineComment inlineComment = new InlineComment(filePath, line, comment, author);
         comments.add(inlineComment);
         project.getMessageBus().syncPublisher(TOPIC).onCommentAdded(inlineComment);
         return inlineComment;
@@ -45,14 +49,51 @@ public final class InlineCommentService {
                 });
     }
 
+    public InlineComment addReply(String threadId, CommentMessage.Author author, String text) {
+        for (InlineComment comment : comments) {
+            if (comment.getId().equals(threadId)) {
+                comment.addMessage(new CommentMessage(author, text));
+                project.getMessageBus().syncPublisher(TOPIC).onReplyAdded(comment);
+                return comment;
+            }
+        }
+        return null;
+    }
+
+    public void removeMessage(String threadId, String messageId) {
+        for (InlineComment comment : comments) {
+            if (comment.getId().equals(threadId)) {
+                comment.removeMessage(messageId);
+                if (comment.getMessageCount() == 0) {
+                    comments.remove(comment);
+                    project.getMessageBus().syncPublisher(TOPIC).onCommentRemoved(comment);
+                } else {
+                    project.getMessageBus().syncPublisher(TOPIC).onCommentEdited(comment);
+                }
+                return;
+            }
+        }
+    }
+
+    public InlineComment updateMessage(String threadId, String messageId, String newText) {
+        for (InlineComment comment : comments) {
+            if (comment.getId().equals(threadId)) {
+                comment.updateMessage(messageId, newText);
+                project.getMessageBus().syncPublisher(TOPIC).onCommentEdited(comment);
+                return comment;
+            }
+        }
+        return null;
+    }
+
+    @Deprecated
     public InlineComment updateComment(String id, String newComment) {
-        for (int i = 0; i < comments.size(); i++) {
-            InlineComment old = comments.get(i);
-            if (old.getId().equals(id)) {
-                InlineComment updated = new InlineComment(id, old.getFilePath(), old.getLine(), newComment);
-                comments.set(i, updated);
-                project.getMessageBus().syncPublisher(TOPIC).onCommentEdited(updated);
-                return updated;
+        for (InlineComment comment : comments) {
+            if (comment.getId().equals(id)) {
+                List<CommentMessage> msgs = comment.getMessages();
+                if (!msgs.isEmpty()) {
+                    return updateMessage(id, msgs.get(0).getMessageId(), newComment);
+                }
             }
         }
         return null;
@@ -77,6 +118,7 @@ public final class InlineCommentService {
         default void onCommentAdded(InlineComment comment) {}
         default void onCommentRemoved(InlineComment comment) {}
         default void onCommentEdited(InlineComment comment) {}
+        default void onReplyAdded(InlineComment comment) {}
         default void onAllCommentsCleared() {}
     }
 }
