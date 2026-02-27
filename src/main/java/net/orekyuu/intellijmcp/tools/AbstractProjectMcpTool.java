@@ -16,6 +16,10 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -61,11 +65,29 @@ public abstract class AbstractProjectMcpTool<R> extends AbstractMcpTool<R> {
         if (app.isDispatchThread()) {
             syncTask.run();
         } else {
-            app.invokeAndWait(syncTask);
+            CompletableFuture<Void> syncFuture = new CompletableFuture<>();
+            app.invokeLater(() -> {
+                try {
+                    syncTask.run();
+                } finally {
+                    syncFuture.complete(null);
+                }
+            });
+            try {
+                syncFuture.get(30, TimeUnit.SECONDS);
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                // Continue without waiting for file sync
+            }
         }
 
         if (!app.isDispatchThread()) {
-            dumbService.waitForSmartMode();
+            CompletableFuture<Void> smartFuture = new CompletableFuture<>();
+            dumbService.runWhenSmart(() -> smartFuture.complete(null));
+            try {
+                smartFuture.get(30, TimeUnit.SECONDS);
+            } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                // Continue without waiting for smart mode
+            }
         }
     }
 }

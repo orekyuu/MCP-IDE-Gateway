@@ -15,6 +15,7 @@ import net.orekyuu.intellijmcp.tools.McpToolBean;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -102,8 +103,13 @@ public class McpServerImpl {
     }
 
     private void startJettyServer(HttpServletSseServerTransportProvider transportProvider) throws Exception {
-        // Create Jetty server
-        jettyServer = new Server(port);
+        // Create Jetty server with explicit thread pool to support long-lived SSE connections
+        QueuedThreadPool threadPool = new QueuedThreadPool(500, 10, 60000);
+        threadPool.setName("jetty");
+        jettyServer = new Server(threadPool);
+        jettyServer.addConnector(new org.eclipse.jetty.server.ServerConnector(jettyServer) {{
+            setPort(port);
+        }});
 
         // Create servlet context
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);

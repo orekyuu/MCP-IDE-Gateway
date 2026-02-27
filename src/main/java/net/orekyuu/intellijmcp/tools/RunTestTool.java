@@ -129,12 +129,12 @@ public class RunTestTool extends AbstractProjectMcpTool<Object> {
 
                         try {
                             RunTestResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
-                            connection.disconnect();
                             return successResult(response);
                         } catch (TimeoutException e) {
-                            connection.disconnect();
                             RunTestResponse timeoutResponse = collector.buildTimeoutResponse();
                             return successResult(timeoutResponse);
+                        } finally {
+                            connection.disconnect();
                         }
 
                     } catch (Exception e) {

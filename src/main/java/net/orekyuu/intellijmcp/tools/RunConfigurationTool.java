@@ -99,11 +99,11 @@ public class RunConfigurationTool extends AbstractProjectMcpTool<Object> {
 
                         try {
                             RunConfigurationResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
-                            connection.disconnect();
                             return successResult(response);
                         } catch (TimeoutException e) {
-                            connection.disconnect();
                             return successResult(collector.buildTimeoutResponse());
+                        } finally {
+                            connection.disconnect();
                         }
 
                     } catch (Exception e) {
