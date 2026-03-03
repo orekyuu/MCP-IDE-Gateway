@@ -17,6 +17,7 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>Git4Idea</depends>
     <depends optional="true" config-file="gradle-support.xml">org.jetbrains.plugins.gradle</depends>
 
     <extensionPoints>
@@ -37,11 +38,11 @@
             parentId="tools"
             instance="net.orekyuu.intellijmcp.settings.McpServerSettingsConfigurable"
             id="net.orekyuu.intellijmcp.settings.McpServerSettingsConfigurable"
-            displayName="MCP Server"/>
-        <toolWindow id="MCP Server"
+            displayName="MCP IDE Gateway"/>
+        <toolWindow id="MCP IDE Gateway"
                     anchor="bottom"
                     factoryClass="net.orekyuu.intellijmcp.ui.McpServerToolWindowFactory"
-                    icon="AllIcons.Actions.Execute"/>
+                    icon="/icons/McpServer.svg"/>
         <backgroundPostStartupActivity
             implementation="net.orekyuu.intellijmcp.comment.InlineCommentStartupActivity"/>
     </extensions>

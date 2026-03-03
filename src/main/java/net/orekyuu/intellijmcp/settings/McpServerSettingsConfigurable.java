@@ -20,7 +20,7 @@ public class McpServerSettingsConfigurable implements Configurable {
     @Nls(capitalization = Nls.Capitalization.Title)
     @Override
     public String getDisplayName() {
-        return "MCP Server";
+        return "MCP IDE Gateway";
     }
 
     @Override
