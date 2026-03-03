@@ -109,6 +109,7 @@ public class McpServerImpl {
         jettyServer = new Server(threadPool);
         jettyServer.addConnector(new org.eclipse.jetty.server.ServerConnector(jettyServer) {{
             setPort(port);
+            setIdleTimeout(-1); // SSE requires long-lived connections
         }});
 
         // Create servlet context
