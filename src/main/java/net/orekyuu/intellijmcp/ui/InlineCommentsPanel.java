@@ -21,6 +21,7 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory;
 import com.intellij.openapi.editor.markup.HighlighterLayer;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -174,6 +175,16 @@ public class InlineCommentsPanel implements Disposable {
             if (!e.getValueIsAdjusting()) updateRightPanel(commentList.getSelectedValue());
         });
 
+        commentList.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    InlineComment comment = commentList.getSelectedValue();
+                    if (comment != null) navigateToComment(comment);
+                }
+            }
+        });
+
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.add(toolbar.getComponent(), BorderLayout.NORTH);
         leftPanel.add(new JScrollPane(commentList), BorderLayout.CENTER);
@@ -281,6 +292,13 @@ public class InlineCommentsPanel implements Disposable {
 
         previewPanel.revalidate();
         previewPanel.repaint();
+    }
+
+    private void navigateToComment(InlineComment comment) {
+        VirtualFile file = VirtualFileManager.getInstance()
+                .findFileByNioPath(Paths.get(comment.getFilePath()));
+        if (file == null) return;
+        new OpenFileDescriptor(project, file, comment.getLine() - 1, 0).navigate(true);
     }
 
     private void releasePreviewEditor() {
