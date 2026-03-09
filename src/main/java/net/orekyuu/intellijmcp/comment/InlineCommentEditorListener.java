@@ -137,21 +137,26 @@ public final class InlineCommentEditorListener implements Disposable {
                     }
                 });
 
-        // Register gutter managers for editors already open at startup
-        for (Editor editor : EditorFactory.getInstance().getAllEditors()) {
-            if (!isIrrelevantEditor(editor)) {
-                gutterManagers.put(editor, new CommentGutterManager(editor, project));
+        // Register gutter managers for editors already open at startup.
+        // Must run on EDT because CommentGutterManager constructor calls EDT-required APIs
+        // (reserveLeftFreePaintersAreaWidth, addEditorMouseMotionListener, etc.).
+        ApplicationManager.getApplication().invokeLater(() -> {
+            for (Editor editor : EditorFactory.getInstance().getAllEditors()) {
+                if (!isIrrelevantEditor(editor)) {
+                    gutterManagers.put(editor, new CommentGutterManager(editor, project));
+                }
             }
-        }
+        });
     }
 
     public static InlineCommentEditorListener getInstance(Project project) {
         return project.getService(InlineCommentEditorListener.class);
     }
 
-    private boolean isIrrelevantEditor(Editor editor) {
+    boolean isIrrelevantEditor(Editor editor) {
         Project editorProject = editor.getProject();
-        return editorProject == null || !editorProject.equals(project);
+        if (editorProject == null || !editorProject.equals(project)) return true;
+        return editor instanceof EditorEx ex && ex.isViewer();
     }
 
     private String getFilePath(Editor editor) {

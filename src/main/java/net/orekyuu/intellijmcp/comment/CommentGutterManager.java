@@ -10,6 +10,9 @@ import com.intellij.openapi.editor.markup.ActiveGutterRenderer;
 import com.intellij.openapi.editor.markup.HighlighterLayer;
 import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx;
+import com.intellij.openapi.editor.event.EditorMouseEvent;
+import com.intellij.openapi.editor.event.EditorMouseListener;
+import com.intellij.openapi.editor.event.EditorMouseMotionListener;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
@@ -18,21 +21,25 @@ import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
-import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
 
 /**
  * Manages the "+" gutter icon that appears when hovering over a line in the editor.
  * Uses a single persistent RangeHighlighter with LineMarkerRendererEx + ActiveGutterRenderer.
- * Position.CUSTOM is used so paint() receives the full gutter width regardless of left-area state.
+ * Position.LEFT is used so paint() receives the left free painters area rectangle.
  */
 public class CommentGutterManager implements LineMarkerRendererEx, ActiveGutterRenderer, Disposable {
 
+    private static final int ICON_AREA_WIDTH = 16;
+
     private final Editor editor;
     private final Project project;
-    private int hoverLine = -1;
+    int hoverLine = -1;
+    boolean columnHovered = false;
     private final RangeHighlighter highlighter;
+
+    private final EditorMouseMotionListener mouseMotionListener;
+    private final EditorMouseListener mouseListener;
 
     public CommentGutterManager(Editor editor, Project project) {
         this.editor = editor;
@@ -47,34 +54,45 @@ public class CommentGutterManager implements LineMarkerRendererEx, ActiveGutterR
         highlighter.setGreedyToRight(true);
         highlighter.setLineMarkerRenderer(this);
 
-        // Attach mouse listeners directly to the gutter component for reliable hover detection
+        // Reserve left free painters area width for the "+" icon
         if (editor instanceof EditorEx editorEx) {
             EditorGutterComponentEx gutter = editorEx.getGutterComponentEx();
-            gutter.addMouseMotionListener(new MouseMotionAdapter() {
-                @Override
-                public void mouseMoved(MouseEvent e) {
-                    int newLine = editorEx.xyToLogicalPosition(new Point(0, e.getY())).line;
-                    if (newLine == hoverLine) return;
-                    hoverLine = newLine;
-                    gutter.repaint();
-                }
-            });
-            gutter.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    if (hoverLine < 0) return;
-                    hoverLine = -1;
-                    gutter.repaint();
-                }
-            });
+            gutter.reserveLeftFreePaintersAreaWidth(this, ICON_AREA_WIDTH);
         }
+
+        // Attach mouse listeners to the editor for reliable hover detection
+        mouseMotionListener = new EditorMouseMotionListener() {
+            @Override
+            public void mouseMoved(@NotNull EditorMouseEvent e) {
+                int newLine = e.getLogicalPosition().line;
+                boolean newColumnHovered = isIconColumnHovered(e);
+                if (newLine == hoverLine && newColumnHovered == columnHovered) return;
+                int prevLine = hoverLine;
+                hoverLine = newLine;
+                columnHovered = newColumnHovered;
+                repaintGutterLine(prevLine);
+                repaintGutterLine(newLine);
+            }
+        };
+        mouseListener = new EditorMouseListener() {
+            @Override
+            public void mouseExited(@NotNull EditorMouseEvent e) {
+                if (hoverLine < 0) return;
+                int prevLine = hoverLine;
+                hoverLine = -1;
+                columnHovered = false;
+                repaintGutterLine(prevLine);
+            }
+        };
+        editor.addEditorMouseMotionListener(mouseMotionListener);
+        editor.addEditorMouseListener(mouseListener);
     }
 
     // --- LineMarkerRendererEx ---
 
     @Override
     public @NotNull Position getPosition() {
-        return Position.CUSTOM;
+        return Position.LEFT;
     }
 
     // --- LineMarkerRenderer (paint) ---
@@ -90,8 +108,8 @@ public class CommentGutterManager implements LineMarkerRendererEx, ActiveGutterR
         int lineY = editor.visualLineToY(visualLine);
         int iconY = lineY + (editor.getLineHeight() - iconSize) / 2;
 
-        // Paint at the left edge of the gutter (left free painters area)
-        int iconX = r.x + JBUI.scale(1);
+        // Paint at the left edge of the LEFT painters area
+        int iconX = r.x;
         AllIcons.General.InlineAdd.paintIcon(null, g, iconX, iconY);
     }
 
@@ -99,6 +117,7 @@ public class CommentGutterManager implements LineMarkerRendererEx, ActiveGutterR
 
     @Override
     public boolean canDoAction(@NotNull Editor editor, @NotNull MouseEvent e) {
+        if (!columnHovered) return false;
         if (hoverLine < 0) return false;
         int iconSize = JBUI.scale(16);
         int visualLine = editor.logicalToVisualPosition(new LogicalPosition(hoverLine, 0)).line;
@@ -121,9 +140,30 @@ public class CommentGutterManager implements LineMarkerRendererEx, ActiveGutterR
 
     @Override
     public void dispose() {
+        editor.removeEditorMouseMotionListener(mouseMotionListener);
+        editor.removeEditorMouseListener(mouseListener);
         if (highlighter.isValid()) {
             editor.getMarkupModel().removeHighlighter(highlighter);
         }
+    }
+
+    private boolean isIconColumnHovered(EditorMouseEvent e) {
+        if (!(editor instanceof EditorEx)) return false;
+        EditorGutterComponentEx gutter = ((EditorEx) editor).getGutterComponentEx();
+        if (e.getMouseEvent().getComponent() != gutter) return false;
+        // getLeftFreePaintersAreaOffset() is private in EditorGutterComponentImpl but
+        // its implementation returns getLineMarkerAreaOffset() — use that public equivalent.
+        int iconStart = gutter.getLineMarkerAreaOffset();
+        int iconEnd = iconStart + JBUI.scale(ICON_AREA_WIDTH);
+        int mouseX = e.getMouseEvent().getX();
+        return mouseX >= iconStart && mouseX <= iconEnd;
+    }
+
+    private void repaintGutterLine(int line) {
+        if (line < 0) return;
+        if (!(editor instanceof EditorEx)) return;
+        EditorGutterComponentEx gutter = ((EditorEx) editor).getGutterComponentEx();
+        gutter.repaint();
     }
 
     private void showCommentDialog(int lineNumber) {
