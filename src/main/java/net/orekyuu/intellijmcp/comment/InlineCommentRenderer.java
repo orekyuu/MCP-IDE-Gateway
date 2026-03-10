@@ -289,7 +289,17 @@ public final class InlineCommentRenderer {
         badgeWrapper.add(badgeLeft, BorderLayout.WEST);
 
         // CardLayout to switch between view and edit modes
-        JPanel contentCard = new JPanel(new CardLayout());
+        // Override getPreferredSize to use only the visible card's size,
+        // preventing blank space reserved for the (larger) edit card.
+        JPanel contentCard = new JPanel(new CardLayout()) {
+            @Override
+            public Dimension getPreferredSize() {
+                for (Component c : getComponents()) {
+                    if (c.isVisible()) return c.getPreferredSize();
+                }
+                return super.getPreferredSize();
+            }
+        };
         contentCard.setBackground(COMMENT_BG);
 
         JEditorPane body = createBodyPane(msg.getText(), project);
