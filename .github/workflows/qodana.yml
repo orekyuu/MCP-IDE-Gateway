@@ -31,16 +31,11 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: JetBrains/qodana-action@v2024.3
         with:
-          config-path: qodana-fix.yaml
+          args: --config,qodana-fix.yaml
           results-dir: ${{ runner.temp }}/qodana-fix/results
           cache-dir: ${{ runner.temp }}/qodana-fix/cache
-
-      - name: Commit Qodana fixes
-        if: github.event_name == 'pull_request'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet || (git add -A && git commit -m "fix: apply Qodana FQN auto-fixes" && git push)
+          push-fixes: pull-request
+          pr-mode: false
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2024.3
