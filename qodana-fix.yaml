@@ -1,0 +1,14 @@
+version: "1.0"
+linter: jetbrains/qodana-jvm-community:2024.3
+
+projectJDK: "21"
+
+fixesStrategy: apply
+
+include:
+  - name: UnnecessaryFullyQualifiedName
+
+exclude:
+  - name: All
+    paths:
+      - build
